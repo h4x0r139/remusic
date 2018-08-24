@@ -46,7 +46,7 @@ public class PlaylistInfo {
     }
 
 
-    public void addPlaylist(long playlistid, String name, int count, String albumart, String author) {
+    public synchronized void addPlaylist(long playlistid, String name, int count, String albumart, String author) {
         final SQLiteDatabase database = mMusicDatabase.getWritableDatabase();
         database.beginTransaction();
         try {
@@ -107,6 +107,21 @@ public class PlaylistInfo {
             values.put(PlaylistInfoColumns.PLAYLIST_ID, playlistid);
             //values.put(PlaylistInfoColumns.PLAYLIST_NAME, name);
             values.put(PlaylistInfoColumns.SONG_COUNT, count);
+            database.update(PlaylistInfoColumns.NAME, values, PlaylistInfoColumns.PLAYLIST_ID + " = " + playlistid, null);
+            database.setTransactionSuccessful();
+        } finally {
+            database.endTransaction();
+        }
+    }
+
+    public synchronized void update(long playlistid, int count, String album) {
+        final SQLiteDatabase database = mMusicDatabase.getWritableDatabase();
+        database.beginTransaction();
+        try {
+            ContentValues values = new ContentValues(3);
+            values.put(PlaylistInfoColumns.PLAYLIST_ID, playlistid);
+            values.put(PlaylistInfoColumns.SONG_COUNT, count);
+            values.put(PlaylistInfoColumns.ALBUM_ART, album);
             database.update(PlaylistInfoColumns.NAME, values, PlaylistInfoColumns.PLAYLIST_ID + " = " + playlistid, null);
             database.setTransactionSuccessful();
         } finally {

@@ -29,12 +29,14 @@ import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import com.bilibili.magicasakura.widgets.TintImageView;
 import com.github.ksoichiro.android.observablescrollview.ObservableRecyclerView;
 import com.github.ksoichiro.android.observablescrollview.ObservableScrollViewCallbacks;
 import com.github.ksoichiro.android.observablescrollview.ScrollUtils;
 import com.wm.remusic.R;
 import com.wm.remusic.fragment.BaseFragment;
 import com.wm.remusic.fragment.MoreFragment;
+import com.wm.remusic.handler.HandlerUtil;
 import com.wm.remusic.info.MusicInfo;
 import com.wm.remusic.service.MusicPlayer;
 import com.wm.remusic.uitl.IConstants;
@@ -44,6 +46,7 @@ import java.util.HashMap;
 
 public class ArtistInfoMusicFragment extends BaseFragment {
     ArrayList<MusicInfo> mList = new ArrayList<>();
+    PlaylistDetailAdapter mAdapter;
 
     public static Fragment getInstance(ArrayList<MusicInfo> mList) {
         ArtistInfoMusicFragment fragment = new ArtistInfoMusicFragment();
@@ -66,10 +69,10 @@ public class ArtistInfoMusicFragment extends BaseFragment {
         }
         Activity parentActivity = getActivity();
         recyclerView = (ObservableRecyclerView) view.findViewById(R.id.scroll);
-        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        recyclerView.setHasFixedSize(false);
-        PlaylistDetailAdapter adapter = new PlaylistDetailAdapter(getActivity(), mList);
-        recyclerView.setAdapter(adapter);
+        recyclerView.setLayoutManager(new LinearLayoutManager(mContext));
+        recyclerView.setHasFixedSize(true);
+        mAdapter = new PlaylistDetailAdapter(getActivity(), mList);
+        recyclerView.setAdapter(mAdapter);
 
         if (parentActivity instanceof ObservableScrollViewCallbacks) {
             // Scroll to the specified offset after layout
@@ -94,6 +97,11 @@ public class ArtistInfoMusicFragment extends BaseFragment {
         return view;
     }
 
+    @Override
+    public void updateTrackInfo() {
+        super.updateTrackInfo();
+        mAdapter.notifyDataSetChanged();
+    }
 
     class PlaylistDetailAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         final static int FIRST_ITEM = 0;
@@ -126,7 +134,17 @@ public class ArtistInfoMusicFragment extends BaseFragment {
         public void onBindViewHolder(final RecyclerView.ViewHolder itemHolder, final int i) {
             if (itemHolder instanceof ItemViewHolder) {
                 final MusicInfo localItem = arraylist.get(i - 1);
-                ((ItemViewHolder) itemHolder).trackNumber.setText(i + "");
+                //判断该条目音乐是否在播放
+                if (MusicPlayer.getCurrentAudioId() == localItem.songId) {
+                    ((ItemViewHolder) itemHolder).trackNumber.setVisibility(View.GONE);
+                    ((ItemViewHolder) itemHolder).playState.setVisibility(View.VISIBLE);
+                    ((ItemViewHolder) itemHolder).playState.setImageResource(R.drawable.song_play_icon);
+                    ((ItemViewHolder) itemHolder).playState.setImageTintList(R.color.theme_color_primary);
+                } else {
+                    ((ItemViewHolder) itemHolder).playState.setVisibility(View.GONE);
+                    ((ItemViewHolder) itemHolder).trackNumber.setVisibility(View.VISIBLE);
+                    ((ItemViewHolder) itemHolder).trackNumber.setText(i + "");
+                }
                 ((ItemViewHolder) itemHolder).title.setText(localItem.musicName);
                 ((ItemViewHolder) itemHolder).artist.setText(localItem.artist);
                 ((ItemViewHolder) itemHolder).menu.setOnClickListener(new View.OnClickListener() {
@@ -198,7 +216,7 @@ public class ArtistInfoMusicFragment extends BaseFragment {
 
             public void onClick(View v) {
                 //// TODO: 2016/1/20
-                new Thread(new Runnable() {
+                HandlerUtil.getInstance(mContext).postDelayed(new Runnable() {
                     @Override
                     public void run() {
                         HashMap<Long, MusicInfo> infos = new HashMap<Long, MusicInfo>();
@@ -211,8 +229,7 @@ public class ArtistInfoMusicFragment extends BaseFragment {
                         }
                         MusicPlayer.playAll(infos, list, 0, false);
                     }
-                }).start();
-
+                },70);
             }
 
         }
@@ -220,6 +237,7 @@ public class ArtistInfoMusicFragment extends BaseFragment {
         public class ItemViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
             protected TextView title, artist, trackNumber;
             protected ImageView menu;
+            TintImageView playState;
 
             public ItemViewHolder(View view) {
                 super(view);
@@ -227,12 +245,13 @@ public class ArtistInfoMusicFragment extends BaseFragment {
                 this.artist = (TextView) view.findViewById(R.id.song_artist);
                 this.trackNumber = (TextView) view.findViewById(R.id.trackNumber);
                 this.menu = (ImageView) view.findViewById(R.id.popup_menu);
+                this.playState = (TintImageView) view.findViewById(R.id.play_state);
                 view.setOnClickListener(this);
             }
 
             @Override
             public void onClick(View v) {
-                new Thread(new Runnable() {
+                HandlerUtil.getInstance(mContext).postDelayed(new Runnable() {
                     @Override
                     public void run() {
                         HashMap<Long, MusicInfo> infos = new HashMap<Long, MusicInfo>();
@@ -243,10 +262,10 @@ public class ArtistInfoMusicFragment extends BaseFragment {
                             list[i] = info.songId;
                             infos.put(list[i], info);
                         }
-                        MusicPlayer.playAll(infos, list, getAdapterPosition() - 1, false);
+                        if (getAdapterPosition() > 0)
+                            MusicPlayer.playAll(infos, list, getAdapterPosition() - 1, false);
                     }
-                }).start();
-
+                }, 70);
             }
 
         }

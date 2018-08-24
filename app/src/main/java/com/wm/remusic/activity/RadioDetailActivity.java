@@ -29,6 +29,7 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bilibili.magicasakura.widgets.TintImageView;
 import com.facebook.binaryresource.BinaryResource;
 import com.facebook.binaryresource.FileBinaryResource;
 import com.facebook.cache.common.CacheKey;
@@ -90,11 +91,9 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
 
     private PlaylistDetailAdapter mAdapter;
     private Toolbar toolbar;
-    private SparseArray<MusicDetailInfo> sparseArray = new SparseArray<MusicDetailInfo>();
     private FrameLayout loadFrameLayout;
     private int musicCount;
     private Handler mHandler;
-    private int tryCount;
     private View loadView;
     private int mFlexibleSpaceImageHeight;
     private ActionBar actionBar;
@@ -104,6 +103,8 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
     private String albumListenCount;
     private FrameLayout headerViewContent;
     private RelativeLayout headerDetail;
+    private ObservableRecyclerView recyclerView;
+    private LoadNetPlaylistInfo mLoadNetList;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -129,7 +130,6 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
         mFlexibleSpaceImageHeight = getResources().getDimensionPixelSize(R.dimen.flexible_space_image_height);
         mActionBarSize = CommonUtils.getActionBarHeight(this);
         mStatusSize = CommonUtils.getStatusHeight(this);
-
 
         tryAgain = (TextView) findViewById(R.id.try_again);
 
@@ -159,7 +159,6 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
             }
         });
         toolbar.setSubtitle(albumDes);
-
     }
 
     private void setHeaderView() {
@@ -179,14 +178,8 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
 
                                 int len = mList.size();
                                 for (int i = 0; i < len; i++) {
-                                    Down.downMusic(MainApplication.context, mList.get(i).getSong_id(), mList.get(i).getSong_name());
+                                    Down.downMusic(MainApplication.context, mList.get(i).getSong_id(), mList.get(i).getSong_name(), artistName);
                                 }
-                                mHandler.post(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        Toast.makeText(RadioDetailActivity.this, "已加入到下载", Toast.LENGTH_SHORT).show();
-                                    }
-                                });
                                 dialog.dismiss();
                             }
                         }).
@@ -198,13 +191,12 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
                         }).show();
             }
         });
-        headerDetail.setVisibility(View.GONE);
 
     }
 
 
     private void setList() {
-        ObservableRecyclerView recyclerView = (ObservableRecyclerView) findViewById(R.id.recyclerview);
+        recyclerView = (ObservableRecyclerView) findViewById(R.id.recyclerview);
         recyclerView.setScrollViewCallbacks(RadioDetailActivity.this);
         recyclerView.setLayoutManager(new LinearLayoutManager(RadioDetailActivity.this));
         recyclerView.setHasFixedSize(false);
@@ -246,7 +238,8 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
             tryAgain.setVisibility(View.GONE);
             loadView = LayoutInflater.from(this).inflate(R.layout.loading, loadFrameLayout, false);
             loadFrameLayout.addView(loadView);
-            new LoadNetPlaylistInfo().execute();
+            mLoadNetList = new LoadNetPlaylistInfo();
+            mLoadNetList.execute();
 
         } else {
             tryAgain.setVisibility(View.VISIBLE);
@@ -262,8 +255,6 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
 
 
     class LoadNetPlaylistInfo extends AsyncTask<Void, Void, Void> {
-        AlbumInfo albumInfo;
-
         @Override
         protected Void doInBackground(final Void... unused) {
             try {
@@ -275,9 +266,18 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
                 for (int i = 0; i < musicCount; i++) {
                     RadioInfo geDanGeInfo = MainApplication.gsonInstance().fromJson(jsonArray.get(i), RadioInfo.class);
                     mList.add(geDanGeInfo);
-                    // PlaylistPlayInfoGet.get(new MusicDetailInfoGet(geDanGeInfo.getSong_id(), i, sparseArray));
                 }
-            } catch (NullPointerException e) {
+
+                for (int i = 0; i < mList.size(); i++) {
+                    MusicInfo musicInfo = new MusicInfo();
+                    musicInfo.songId = Integer.parseInt(mList.get(i).getSong_id());
+                    musicInfo.musicName = mList.get(i).getSong_name();
+                    musicInfo.islocal = false;
+                    musicInfo.albumId = Integer.parseInt(mList.get(i).getSong_duration());
+                    musicInfo.albumData = albumPath;
+                    adapterList.add(musicInfo);
+                }
+            } catch (Exception e) {
                 e.printStackTrace();
             }
 
@@ -286,73 +286,12 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
 
         @Override
         protected void onPostExecute(Void aVoid) {
-            if (albumInfo != null) {
-                if (albumDes == null) {
-                    albumDes = albumInfo.getInfo();
-                    toolbar.setSubtitle(albumDes);
-                }
-            }
-
-            new AsyncTask<Void, Void, Void>() {
-                @Override
-                protected Void doInBackground(Void... params) {
-                    for (int i = 0; i < mList.size(); i++) {
-                        MusicInfo musicInfo = new MusicInfo();
-                        musicInfo.songId = Integer.parseInt(mList.get(i).getSong_id());
-                        musicInfo.musicName = mList.get(i).getSong_name();
-                        musicInfo.islocal = false;
-                        musicInfo.albumId = Integer.parseInt(mList.get(i).getSong_duration());
-                        musicInfo.albumData = albumPath;
-                        adapterList.add(musicInfo);
-                    }
-                    return null;
-                }
-
-                @Override
-                protected void onPostExecute(Void aVoid) {
-                    Log.e("mlist", mList.toString());
-                    loadFrameLayout.removeAllViews();
-                    mAdapter.updateDataSet(adapterList);
-                    headerDetail.setVisibility(View.VISIBLE);
-                }
-            }.execute();
-
+            loadFrameLayout.removeAllViews();
+            recyclerView.setVisibility(View.VISIBLE);
+            mAdapter.updateDataSet(adapterList);
         }
+
     }
-
-
-//    Runnable showPlaylistView = new Runnable() {
-//        @Override
-//        public void run() {
-//            if (sparseArray.size() != musicCount && tryCount < 36) {
-//                mHandler.postDelayed(showPlaylistView, 200);
-//                tryCount++;
-//            } else {
-//                new AsyncTask<Void, Void, Void>() {
-//                    @Override
-//                    protected Void doInBackground(Void... params) {
-//                        for (int i = 0; i < mList.size(); i++) {
-//                            MusicInfo musicInfo = new MusicInfo();
-//                            musicInfo.songId = Integer.parseInt(mList.get(i).getSong_id());
-//                            musicInfo.musicName = mList.get(i).getSong_name();
-//                            musicInfo.islocal = false;
-//                            musicInfo.albumId = Integer.parseInt(mList.get(i).getSong_duration());
-//                            musicInfo.albumData = albumPath;
-//                            adapterList.add(musicInfo);
-//                        }
-//                        return null;
-//                    }
-//
-//                    @Override
-//                    protected void onPostExecute(Void aVoid) {
-//                        Log.e("mlist", mList.toString());
-//                        loadFrameLayout.removeAllViews();
-//                        mAdapter.updateDataSet(adapterList);
-//                    }
-//                }.execute();
-//            }
-//        }
-//    };
 
 
     @Override
@@ -365,6 +304,11 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
         super.onPause();
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mLoadNetList.cancel(true);
+    }
 
     private void setAlbumart() {
         albumTitle.setText(albumName);
@@ -491,6 +435,11 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
 
     }
 
+    @Override
+    public void updateTrack() {
+        super.updateTrack();
+        mAdapter.notifyDataSetChanged();
+    }
 
     class PlaylistDetailAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         final static int FIRST_ITEM = 0;
@@ -523,14 +472,23 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
         public void onBindViewHolder(final RecyclerView.ViewHolder itemHolder, final int i) {
             if (itemHolder instanceof ItemViewHolder) {
                 final MusicInfo localItem = arraylist.get(i - 1);
-                ((ItemViewHolder) itemHolder).trackNumber.setText(i + "");
+                //判断该条目音乐是否在播放
+                if (MusicPlayer.getCurrentAudioId() == localItem.songId) {
+                    ((ItemViewHolder) itemHolder).trackNumber.setVisibility(View.GONE);
+                    ((ItemViewHolder) itemHolder).playState.setVisibility(View.VISIBLE);
+                    ((ItemViewHolder) itemHolder).playState.setImageResource(R.drawable.song_play_icon);
+                    ((ItemViewHolder) itemHolder).playState.setImageTintList(R.color.theme_color_primary);
+                } else {
+                    ((ItemViewHolder) itemHolder).playState.setVisibility(View.GONE);
+                    ((ItemViewHolder) itemHolder).trackNumber.setVisibility(View.VISIBLE);
+                    ((ItemViewHolder) itemHolder).trackNumber.setText(i + "");
+                }
                 ((ItemViewHolder) itemHolder).title.setText(localItem.musicName);
                 ((ItemViewHolder) itemHolder).artist.setText(artistName);
                 ((ItemViewHolder) itemHolder).menu.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
 
-                        Log.e("re", "get");
                         HttpUtil.getResposeJsonObject("http://tingapi.ting.baidu.com/v1/restserver/ting?from=android&version=5.8.1.0&channel=ppzs&operator=3&method=baidu.ting.artist.item&format=json&tinguid=1035&artistid=14");
 
                         if (localItem.islocal) {
@@ -542,22 +500,6 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
                                     IConstants.MUSICOVERFLOW);
                             morefragment.show(((AppCompatActivity) mContext).getSupportFragmentManager(), "music");
                         }
-//                        new AlertDialog.Builder(mContext).setTitle("要下载音乐吗").
-//                                setPositiveButton(mContext.getString(R.string.sure), new DialogInterface.OnClickListener() {
-//
-//                                    @Override
-//                                    public void onClick(DialogInterface dialog, int which) {
-//
-//                                        Down.downMusic(MainApplication.context, localItem.songId + "", localItem.musicName);
-//                                        dialog.dismiss();
-//                                    }
-//                                }).
-//                                setNegativeButton(mContext.getString(R.string.cancel), new DialogInterface.OnClickListener() {
-//                                    @Override
-//                                    public void onClick(DialogInterface dialog, int which) {
-//                                        dialog.dismiss();
-//                                    }
-//                                }).show();
                     }
                 });
 
@@ -601,7 +543,7 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
 
             public void onClick(View v) {
                 //// TODO: 2016/1/20
-                new Thread(new Runnable() {
+                mHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
                         HashMap<Long, MusicInfo> infos = new HashMap<Long, MusicInfo>();
@@ -614,7 +556,7 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
                         }
                         MusicPlayer.playAll(infos, list, 0, false);
                     }
-                }).start();
+                },70);
 
             }
 
@@ -623,6 +565,7 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
         public class ItemViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
             protected TextView title, artist, trackNumber;
             protected ImageView menu;
+            TintImageView playState;
 
             public ItemViewHolder(View view) {
                 super(view);
@@ -630,12 +573,13 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
                 this.artist = (TextView) view.findViewById(R.id.song_artist);
                 this.trackNumber = (TextView) view.findViewById(R.id.trackNumber);
                 this.menu = (ImageView) view.findViewById(R.id.popup_menu);
+                this.playState = (TintImageView) view.findViewById(R.id.play_state);
                 view.setOnClickListener(this);
             }
 
             @Override
             public void onClick(View v) {
-                new Thread(new Runnable() {
+                mHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
                         HashMap<Long, MusicInfo> infos = new HashMap<Long, MusicInfo>();
@@ -646,26 +590,10 @@ public class RadioDetailActivity extends BaseActivity implements ObservableScrol
                             list[i] = info.songId;
                             infos.put(list[i], info);
                         }
-
-//                            long[] list = new long[arraylist.size()];
-//                            HashMap<Long,MusicInfo> infos = new HashMap<Long,MusicInfo>();
-//                            for (int i = 0; i < arraylist.size(); i++) {
-//                                list[i] = Long.parseLong(arraylist.get(i).getSong_id());
-//                                MusicInfo musicInfo = new MusicInfo();
-//                                musicInfo.songId = Integer.parseInt(arraylist.get(i).getSong_id());
-//                                musicInfo.musicName = arraylist.get(i).getTitle();
-//                                musicInfo.artist = sparseArray.get(i).getArtist_name();
-//                                musicInfo.islocal = false;
-//                                musicInfo.albumName = sparseArray.get(i).getAlbum_title();
-//                                musicInfo.albumId = Integer.parseInt(arraylist.get(i).getAlbum_id());
-//                                musicInfo.artistId = Integer.parseInt(sparseArray.get(i).getArtist_id());
-//                                musicInfo.lrc = sparseArray.get(i).getLrclink();
-//                                musicInfo.albumData = sparseArray.get(i).getPic_radio();
-//                                infos.put(list[i] , musicInfo);
-//                            }
-                        MusicPlayer.playAll(infos, list, getAdapterPosition() - 1, false);
+                        if (getAdapterPosition() > 0)
+                            MusicPlayer.playAll(infos, list, getAdapterPosition() - 1, false);
                     }
-                }).start();
+                },70);
 
             }
 

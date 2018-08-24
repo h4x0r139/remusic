@@ -21,6 +21,7 @@ import com.wm.remusic.service.MusicPlayer;
 import com.wm.remusic.uitl.IConstants;
 
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 
 import static com.wm.remusic.service.MusicPlayer.mService;
 
@@ -33,7 +34,8 @@ public class BaseActivity extends AppCompatActivity implements ServiceConnection
     private MusicPlayer.ServiceToken mToken;
     private PlaybackStatus mPlaybackStatus; //receiver 接受播放状态变化等
     private QuickControlsFragment fragment; //底部播放控制栏
-
+    private String TAG = "BaseActivity";
+    private ArrayList<MusicStateListener> mMusicListener = new ArrayList<>();
 
     /**
      * 更新播放队列
@@ -46,12 +48,44 @@ public class BaseActivity extends AppCompatActivity implements ServiceConnection
      * 更新歌曲状态信息
      */
     public void updateTrackInfo() {
+        for (final MusicStateListener listener : mMusicListener) {
+            if (listener != null) {
+                listener.reloadAdapter();
+                listener.updateTrackInfo();
+            }
+        }
     }
 
+    /**
+     *  fragment界面刷新
+     */
     public void refreshUI() {
+        for (final MusicStateListener listener : mMusicListener) {
+            if (listener != null) {
+                listener.reloadAdapter();
+            }
+        }
+
     }
 
     public void updateTime() {
+        for (final MusicStateListener listener : mMusicListener) {
+            if (listener != null) {
+                listener.updateTime();
+            }
+        }
+    }
+
+    /**
+     *  歌曲切换
+     */
+    public void updateTrack() {
+
+    }
+
+
+
+    public void updateLrc() {
 
     }
 
@@ -59,6 +93,21 @@ public class BaseActivity extends AppCompatActivity implements ServiceConnection
      * @param p 更新歌曲缓冲进度值，p取值从0~100
      */
     public void updateBuffer(int p) {
+
+    }
+
+    public void changeTheme() {
+        for (final MusicStateListener listener : mMusicListener) {
+            if (listener != null) {
+                listener.changeTheme();
+            }
+        }
+    }
+
+    /**
+     * @param l 歌曲是否加载中
+     */
+    public void loading(boolean l){
 
     }
 
@@ -84,7 +133,7 @@ public class BaseActivity extends AppCompatActivity implements ServiceConnection
      * @param show 显示或关闭底部播放控制栏
      */
     protected void showQuickControl(boolean show) {
-        Log.e("showorhide", MusicPlayer.getQueue().length + "");
+        Log.d(TAG, MusicPlayer.getQueue().length + "");
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
         if (show) {
             if (fragment == null) {
@@ -112,26 +161,15 @@ public class BaseActivity extends AppCompatActivity implements ServiceConnection
         f.addAction(IConstants.MUSIC_COUNT_CHANGED);
         f.addAction(MediaService.TRACK_PREPARED);
         f.addAction(MediaService.BUFFER_UP);
-        f.addAction("com.wm.remusic.emptyplaylist");
+        f.addAction(IConstants.EMPTY_LIST);
+        f.addAction(MediaService.MUSIC_CHANGED);
+        f.addAction(MediaService.LRC_UPDATED);
+        f.addAction(IConstants.PLAYLIST_COUNT_CHANGED);
+        f.addAction(MediaService.MUSIC_LODING);
         registerReceiver(mPlaybackStatus, new IntentFilter(f));
         showQuickControl(true);
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-
-    }
 
     @Override
     public void onServiceConnected(final ComponentName name, final IBinder service) {
@@ -152,6 +190,7 @@ public class BaseActivity extends AppCompatActivity implements ServiceConnection
             unregisterReceiver(mPlaybackStatus);
         } catch (final Throwable e) {
         }
+        mMusicListener.clear();
 
     }
 
@@ -159,6 +198,22 @@ public class BaseActivity extends AppCompatActivity implements ServiceConnection
         if (mToken != null) {
             MusicPlayer.unbindFromService(mToken);
             mToken = null;
+        }
+    }
+
+    public void setMusicStateListenerListener(final MusicStateListener status) {
+        if (status == this) {
+            throw new UnsupportedOperationException("Override the method, don't add a listener");
+        }
+
+        if (status != null) {
+            mMusicListener.add(status);
+        }
+    }
+
+    public void removeMusicStateListenerListener(final MusicStateListener status) {
+        if (status != null) {
+            mMusicListener.remove(status);
         }
     }
 
@@ -187,21 +242,26 @@ public class BaseActivity extends AppCompatActivity implements ServiceConnection
                     baseActivity.updateTime();
                 } else if (action.equals(MediaService.BUFFER_UP)) {
                     baseActivity.updateBuffer(intent.getIntExtra("progress", 0));
-                } else if (action.equals("com.wm.remusic.emptyplaylist")) {
-
+                } else if (action.equals(MediaService.MUSIC_LODING)) {
+                    baseActivity.loading(intent.getBooleanExtra("isloading",false));
                 } else if (action.equals(MediaService.REFRESH)) {
 
                 } else if (action.equals(IConstants.MUSIC_COUNT_CHANGED)) {
                     baseActivity.refreshUI();
-                } else if (action.equals(MediaService.PLAYLIST_CHANGED)) {
-
+                } else if (action.equals(IConstants.PLAYLIST_COUNT_CHANGED)) {
+                    baseActivity.refreshUI();
                 } else if (action.equals(MediaService.QUEUE_CHANGED)) {
                     baseActivity.updateQueue();
                 } else if (action.equals(MediaService.TRACK_ERROR)) {
                     final String errorMsg = context.getString(R.string.exit,
                             intent.getStringExtra(MediaService.TrackErrorExtra.TRACK_NAME));
                     Toast.makeText(baseActivity, errorMsg, Toast.LENGTH_SHORT).show();
+                } else if (action.equals(MediaService.MUSIC_CHANGED)) {
+                    baseActivity.updateTrack();
+                } else if (action.equals(MediaService.LRC_UPDATED)) {
+                    baseActivity.updateLrc();
                 }
+
             }
         }
     }

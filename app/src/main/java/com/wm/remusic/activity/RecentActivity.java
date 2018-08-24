@@ -9,6 +9,7 @@ import android.support.v7.app.ActionBar;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,6 +18,7 @@ import android.widget.TextView;
 
 import com.wm.remusic.R;
 import com.wm.remusic.fragment.MoreFragment;
+import com.wm.remusic.handler.HandlerUtil;
 import com.wm.remusic.info.MusicInfo;
 import com.wm.remusic.provider.RecentStore;
 import com.wm.remusic.recent.Song;
@@ -26,6 +28,7 @@ import com.wm.remusic.service.MediaService;
 import com.wm.remusic.service.MusicPlayer;
 import com.wm.remusic.uitl.CommonUtils;
 import com.wm.remusic.uitl.IConstants;
+import com.wm.remusic.uitl.L;
 import com.wm.remusic.uitl.MusicUtils;
 import com.wm.remusic.widget.DividerItemDecoration;
 
@@ -44,19 +47,10 @@ public class RecentActivity extends BaseActivity {
     private Toolbar toolbar;
     private List<Song> mList;
     private RecyclerView recyclerView;
+    private String TAG = "RecentActivity";
+    private boolean d = true;
     private LinearLayoutManager layoutManager;
     //接受歌曲播放变化和列表变化广播，刷新列表
-    private BroadcastReceiver mStatusListener = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if (action.equals(MediaService.META_CHANGED)) {
-                reloadAdapter();
-            } else if (action.equals(MediaService.PLAYLIST_CHANGED)) {
-                reloadAdapter();
-            }
-        }
-    };
 
     @Override
     public void onCreate(final Bundle savedInstanceState) {
@@ -73,6 +67,7 @@ public class RecentActivity extends BaseActivity {
         recyclerView = (RecyclerView) findViewById(R.id.recyclerview);
         layoutManager = new LinearLayoutManager(this);
         recyclerView.setLayoutManager(layoutManager);
+        recyclerView.setHasFixedSize(true);
 
         toolbar = (Toolbar) findViewById(R.id.toolbar);
         toolbar.setPadding(0, CommonUtils.getStatusHeight(RecentActivity.this), 0, 0);
@@ -93,20 +88,11 @@ public class RecentActivity extends BaseActivity {
 
 
     //刷新列表
-    private void reloadAdapter() {
-        new AsyncTask<Void, Void, Void>() {
-            @Override
-            protected Void doInBackground(final Void... unused) {
-                //List<MusicInfo> songList = MusicUtils.getMusicLists(getContext(), recentStore.getRecentIds());
-                //mAdapter.updateDataSet(songList);
-                return null;
-            }
+    public void updateTrack() {
+        if(mAdapter != null){
+            mAdapter.updateDataSet(mList);
+        }
 
-            @Override
-            protected void onPostExecute(Void aVoid) {
-                mAdapter.notifyDataSetChanged();
-            }
-        }.execute();
     }
 
     //异步加载recyclerview界面
@@ -150,6 +136,7 @@ public class RecentActivity extends BaseActivity {
         //更新adpter的数据
         public void updateDataSet(List<Song> list) {
             this.mList = list;
+            notifyDataSetChanged();
         }
 
         @Override
@@ -223,7 +210,7 @@ public class RecentActivity extends BaseActivity {
 
             public void onClick(View v) {
                 //// TODO: 2016/1/20
-                new Thread(new Runnable() {
+                HandlerUtil.getInstance(RecentActivity.this).postDelayed(new Runnable() {
                     @Override
                     public void run() {
                         long[] list = new long[mList.size()];
@@ -237,7 +224,7 @@ public class RecentActivity extends BaseActivity {
                         }
                         MusicPlayer.playAll(infos, list, 0, false);
                     }
-                }).start();
+                },70);
 
             }
 
@@ -268,7 +255,7 @@ public class RecentActivity extends BaseActivity {
 
             @Override
             public void onClick(View v) {
-                new Thread(new Runnable() {
+                HandlerUtil.getInstance(RecentActivity.this).postDelayed(new Runnable() {
                     @Override
                     public void run() {
                         long[] list = new long[mList.size()];
@@ -280,9 +267,10 @@ public class RecentActivity extends BaseActivity {
                             info.albumData = MusicUtils.getAlbumArtUri(info.albumId) + "";
                             infos.put(list[i], info);
                         }
-                        MusicPlayer.playAll(infos, list, getAdapterPosition() - 1, false);
+                        if (getAdapterPosition() > 0)
+                            MusicPlayer.playAll(infos, list, getAdapterPosition() - 1, false);
                     }
-                }).start();
+                }, 70);
 
             }
         }

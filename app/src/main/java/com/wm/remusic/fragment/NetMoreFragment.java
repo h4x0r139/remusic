@@ -1,10 +1,10 @@
 package com.wm.remusic.fragment;
 
 
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v4.app.DialogFragment;
@@ -31,6 +31,7 @@ import com.wm.remusic.activity.ArtistDetailActivity;
 import com.wm.remusic.adapter.MusicFlowAdapter;
 import com.wm.remusic.adapter.OverFlowAdapter;
 import com.wm.remusic.adapter.OverFlowItem;
+import com.wm.remusic.dialog.AddNetPlaylistDialog;
 import com.wm.remusic.downmusic.Down;
 import com.wm.remusic.handler.HandlerUtil;
 import com.wm.remusic.info.MusicInfo;
@@ -38,15 +39,17 @@ import com.wm.remusic.json.SearchAlbumInfo;
 import com.wm.remusic.json.SearchArtistInfo;
 import com.wm.remusic.net.BMA;
 import com.wm.remusic.net.HttpUtil;
+import com.wm.remusic.service.MusicPlayer;
 import com.wm.remusic.widget.DividerItemDecoration;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 /**
  * Created by wm on 2016/1/31.
  */
-public class NetMoreFragment extends DialogFragment {
+public class NetMoreFragment extends AttachDialogFragment {
     private int type;
     private double heightPercent;
     private TextView topTitle;
@@ -60,7 +63,6 @@ public class NetMoreFragment extends DialogFragment {
     private LinearLayoutManager layoutManager;
     private String args;
     private String musicName, artist, albumId, albumName;
-    private Context mContext;
     private Handler mHandler;
 
     public static NetMoreFragment newInstance(String id, String albumId, String artistId) {
@@ -119,7 +121,7 @@ public class NetMoreFragment extends DialogFragment {
         View view = inflater.inflate(R.layout.more_fragment, container);
         topTitle = (TextView) view.findViewById(R.id.pop_list_title);
         recyclerView = (RecyclerView) view.findViewById(R.id.pop_list);
-        layoutManager = new LinearLayoutManager(getActivity());
+        layoutManager = new LinearLayoutManager(mContext);
         recyclerView.setHasFixedSize(true);
         recyclerView.setLayoutManager(layoutManager);
         getList();
@@ -130,7 +132,7 @@ public class NetMoreFragment extends DialogFragment {
 
     //设置分割线
     private void setItemDecoration() {
-        RecyclerView.ItemDecoration itemDecoration = new DividerItemDecoration(getActivity(), DividerItemDecoration.VERTICAL_LIST);
+        RecyclerView.ItemDecoration itemDecoration = new DividerItemDecoration(mContext, DividerItemDecoration.VERTICAL_LIST);
         recyclerView.addItemDecoration(itemDecoration);
     }
 
@@ -144,7 +146,7 @@ public class NetMoreFragment extends DialogFragment {
         topTitle.setText("歌曲：" + " " + musicName);
         heightPercent = 0.6;
         setMusicInfo();
-        muaicflowAdapter = new MusicFlowAdapter(getActivity(), mlistInfo, adapterMusicInfo);
+        muaicflowAdapter = new MusicFlowAdapter(mContext, mlistInfo, adapterMusicInfo);
     }
 
     private void setClick() {
@@ -154,11 +156,25 @@ public class NetMoreFragment extends DialogFragment {
             public void onItemClick(View view, String data) {
                 switch (Integer.parseInt(data)) {
                     case 0:
-                        Toast.makeText(mContext, "网络歌曲暂时不支持加入下一首", Toast.LENGTH_SHORT).show();
+                        mHandler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (adapterMusicInfo.songId == MusicPlayer.getCurrentAudioId())
+                                    return;
+
+                                long[] ids = new long[1];
+                                ids[0] = adapterMusicInfo.songId;
+                                HashMap<Long, MusicInfo> map = new HashMap<Long, MusicInfo>();
+                                map.put(ids[0], adapterMusicInfo);
+                                MusicPlayer.playNext(mContext, map, ids);
+                            }
+                        }, 100);
                         dismiss();
                         break;
                     case 1:
-                        Toast.makeText(mContext, "网络歌曲暂时不支持收藏", Toast.LENGTH_SHORT).show();
+                        final ArrayList<MusicInfo> musicList = new ArrayList<MusicInfo>();
+                        musicList.add(adapterMusicInfo);
+                        AddNetPlaylistDialog.newInstance(musicList).show(getFragmentManager(), "add");
                         dismiss();
                         break;
                     case 2:
@@ -166,7 +182,7 @@ public class NetMoreFragment extends DialogFragment {
                         shareIntent.setAction(Intent.ACTION_SEND);
                         shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://" + adapterMusicInfo.data));
                         shareIntent.setType("audio/*");
-                        getActivity().startActivity(Intent.createChooser(shareIntent, getResources().getString(R.string.shared_to)));
+                        mContext.startActivity(Intent.createChooser(shareIntent, getResources().getString(R.string.shared_to)));
                         dismiss();
                         break;
                     case 3:
@@ -175,14 +191,7 @@ public class NetMoreFragment extends DialogFragment {
 
                                     @Override
                                     public void onClick(DialogInterface dialog, int which) {
-
-                                        Down.downMusic(MainApplication.context, adapterMusicInfo.songId + "", adapterMusicInfo.musicName);
-                                        mHandler.post(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                Toast.makeText(mContext, "已加入到下载", Toast.LENGTH_SHORT).show();
-                                            }
-                                        });
+                                        Down.downMusic(MainApplication.context, adapterMusicInfo.songId + "", adapterMusicInfo.musicName, adapterMusicInfo.artist);
                                         dialog.dismiss();
                                     }
                                 }).
@@ -197,9 +206,10 @@ public class NetMoreFragment extends DialogFragment {
                     case 4:
 
                         if (adapterMusicInfo.islocal) {
-                            new Thread(new Runnable() {
+                            new AsyncTask<Void, Void, Void>() {
+
                                 @Override
-                                public void run() {
+                                protected Void doInBackground(Void... params) {
                                     ArrayList<SearchArtistInfo> artistResults = new ArrayList<>();
                                     try {
 
@@ -234,8 +244,9 @@ public class NetMoreFragment extends DialogFragment {
 //                                        intent.putExtra("albumdetail",info.getAlbum_desc());
                                         mContext.startActivity(intent);
                                     }
+                                    return null;
                                 }
-                            }).start();
+                            }.execute();
                         } else {
 
                             Intent intent = new Intent(mContext, ArtistDetailActivity.class);
@@ -248,9 +259,10 @@ public class NetMoreFragment extends DialogFragment {
                     case 5:
 
                         if (adapterMusicInfo.islocal) {
-                            new Thread(new Runnable() {
+                            new AsyncTask<Void, Void, Void>() {
+
                                 @Override
-                                public void run() {
+                                protected Void doInBackground(Void... params) {
                                     ArrayList<SearchAlbumInfo> albumResults = new ArrayList<SearchAlbumInfo>();
                                     try {
 
@@ -290,12 +302,13 @@ public class NetMoreFragment extends DialogFragment {
                                         intent.putExtra("albumdetail", info.getAlbum_desc());
                                         mContext.startActivity(intent);
                                     }
-
+                                    return null;
                                 }
-                            }).start();
+                            }.execute();
+
                         } else {
 
-                            Intent intent = new Intent(getActivity(), AlbumsDetailActivity.class);
+                            Intent intent = new Intent(mContext, AlbumsDetailActivity.class);
                             intent.putExtra("albumid", adapterMusicInfo.albumId + "");
                             intent.putExtra("albumart", adapterMusicInfo.albumData);
                             intent.putExtra("albumname", adapterMusicInfo.albumName);
@@ -306,7 +319,7 @@ public class NetMoreFragment extends DialogFragment {
                         break;
                     case 6:
                         MusicDetailFragment detailFrament = MusicDetailFragment.newInstance(adapterMusicInfo);
-                        detailFrament.show(getActivity().getFragmentManager(), "detail");
+                        detailFrament.show(getActivity().getSupportFragmentManager(), "detail");
                         dismiss();
                         break;
                     default:
@@ -335,14 +348,13 @@ public class NetMoreFragment extends DialogFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setStyle(DialogFragment.STYLE_NO_FRAME, R.style.CustomDatePickerDialog);
-        mContext = getContext();
     }
 
     @Override
     public void onStart() {
         super.onStart();
         //设置fragment高度 、宽度
-        int dialogHeight = (int) (getActivity().getResources().getDisplayMetrics().heightPixels * heightPercent);
+        int dialogHeight = (int) (mContext.getResources().getDisplayMetrics().heightPixels * heightPercent);
         ;
 //        WindowManager wm = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
 //        Display display = wm.getDefaultDisplay();

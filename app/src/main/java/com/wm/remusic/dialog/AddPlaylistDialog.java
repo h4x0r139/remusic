@@ -19,6 +19,7 @@ import android.widget.TextView;
 import com.facebook.drawee.view.SimpleDraweeView;
 import com.wm.remusic.MainApplication;
 import com.wm.remusic.R;
+import com.wm.remusic.fragment.AttachDialogFragment;
 import com.wm.remusic.info.Playlist;
 import com.wm.remusic.provider.PlaylistInfo;
 import com.wm.remusic.provider.PlaylistsManager;
@@ -32,7 +33,7 @@ import java.util.ArrayList;
 /**
  * Created by wm on 20/12/15.
  */
-public class AddPlaylistDialog extends DialogFragment {
+public class AddPlaylistDialog extends AttachDialogFragment {
     private PlaylistInfo playlistInfo;
     private PlaylistsManager playlistsManager;
     private RecyclerView recyclerView;
@@ -89,7 +90,7 @@ public class AddPlaylistDialog extends DialogFragment {
                                 String albumart = null;
 
                                 for (long id : musicId) {
-                                    albumart = MusicUtils.getalbumdata(MainApplication.context, id);
+                                    albumart = MusicUtils.getAlbumdata(MainApplication.context, id);
                                     if (albumart != null) {
                                         break;
                                     }
@@ -98,7 +99,7 @@ public class AddPlaylistDialog extends DialogFragment {
                                 playlistInfo.addPlaylist(editText.getText().hashCode(), editText.getText().toString(),
                                         musicId.length, "file://" + albumart, "local");
                                 for (int i = 0; i < musicId.length; i++) {
-                                    playlistsManager.Insert(MainApplication.context, editText.getText().hashCode(), musicId[i], i);
+                                    playlistsManager.insert(MainApplication.context, editText.getText().hashCode(), musicId[i], i);
                                 }
                                 Intent intent = new Intent(IConstants.PLAYLIST_COUNT_CHANGED);
                                 MainApplication.context.sendBroadcast(intent);
@@ -191,7 +192,7 @@ public class AddPlaylistDialog extends DialogFragment {
 
                 if (getAdapterPosition() == 0 && musicTracks.size() == 0) {
                     for (int i = 0; i < musicId.length; i++) {
-                        playlistsManager.Insert(getContext(), playlist.id, musicId[i], 0);
+                        playlistsManager.insert(getContext(), playlist.id, musicId[i], 0);
                     }
                 }
 
@@ -199,7 +200,7 @@ public class AddPlaylistDialog extends DialogFragment {
 
                     for (int j = 0; j < musicTracks.size(); j++) {
                         if (musicId[i] != musicTracks.get(j).mId) {
-                            playlistsManager.Insert(getContext(), playlist.id, musicId[i], 0);
+                            playlistsManager.insert(getContext(), playlist.id, musicId[i], 0);
                         }
                     }
 

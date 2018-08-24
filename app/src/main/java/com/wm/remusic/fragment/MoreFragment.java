@@ -15,7 +15,6 @@ import android.support.v4.app.DialogFragment;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -55,7 +54,7 @@ import java.util.List;
 /**
  * Created by wm on 2016/1/31.
  */
-public class MoreFragment extends DialogFragment {
+public class MoreFragment extends AttachDialogFragment {
     private int type;
     private double heightPercent;
     private TextView topTitle;
@@ -141,9 +140,10 @@ public class MoreFragment extends DialogFragment {
         View view = inflater.inflate(R.layout.more_fragment, container);
         topTitle = (TextView) view.findViewById(R.id.pop_list_title);
         recyclerView = (RecyclerView) view.findViewById(R.id.pop_list);
-        layoutManager = new LinearLayoutManager(getActivity());
+        layoutManager = new LinearLayoutManager(mContext);
         recyclerView.setHasFixedSize(true);
         recyclerView.setLayoutManager(layoutManager);
+        recyclerView.setHasFixedSize(true);
         getList();
         setClick();
         setItemDecoration();
@@ -152,7 +152,7 @@ public class MoreFragment extends DialogFragment {
 
     //设置分割线
     private void setItemDecoration() {
-        RecyclerView.ItemDecoration itemDecoration = new DividerItemDecoration(getActivity(), DividerItemDecoration.VERTICAL_LIST);
+        RecyclerView.ItemDecoration itemDecoration = new DividerItemDecoration(mContext, DividerItemDecoration.VERTICAL_LIST);
         recyclerView.addItemDecoration(itemDecoration);
     }
 
@@ -161,6 +161,9 @@ public class MoreFragment extends DialogFragment {
         if (type == IConstants.MUSICOVERFLOW) {
             // long musicId = Long.parseLong(args.trim());
             adapterMusicInfo = getArguments().getParcelable("music");
+            if(adapterMusicInfo == null){
+                adapterMusicInfo = new MusicInfo();
+            }
             artist = adapterMusicInfo.artist;
             albumId = adapterMusicInfo.albumId + "";
             albumName = adapterMusicInfo.albumName;
@@ -168,29 +171,29 @@ public class MoreFragment extends DialogFragment {
             topTitle.setText("歌曲：" + " " + musicName);
             heightPercent = 0.6;
             setMusicInfo();
-            muaicflowAdapter = new MusicFlowAdapter(getActivity(), mlistInfo, adapterMusicInfo);
+            muaicflowAdapter = new MusicFlowAdapter(mContext, mlistInfo, adapterMusicInfo);
 
         } else {
             switch (type) {
                 case IConstants.ARTISTOVERFLOW:
                     String artist = args;
-                    list = MusicUtils.queryMusic(mContext, null, artist, IConstants.START_FROM_ARTIST);
+                    list = MusicUtils.queryMusic(mContext, artist, IConstants.START_FROM_ARTIST);
                     topTitle.setText("歌曲：" + " " + list.get(0).artist);
                     break;
                 case IConstants.ALBUMOVERFLOW:
                     String albumId = args;
-                    list = MusicUtils.queryMusic(mContext, null, albumId, IConstants.START_FROM_ALBUM);
+                    list = MusicUtils.queryMusic(mContext, albumId, IConstants.START_FROM_ALBUM);
                     topTitle.setText("专辑：" + " " + list.get(0).albumName);
                     break;
                 case IConstants.FOLDEROVERFLOW:
                     String folder = args;
-                    list = MusicUtils.queryMusic(mContext, null, folder, IConstants.START_FROM_FOLDER);
+                    list = MusicUtils.queryMusic(mContext, folder, IConstants.START_FROM_FOLDER);
                     topTitle.setText("文件夹：" + " " + folder);
                     break;
             }
             setCommonInfo();
             heightPercent = 0.3;
-            commonAdapter = new OverFlowAdapter(getActivity(), mlistInfo, list);
+            commonAdapter = new OverFlowAdapter(mContext, mlistInfo, list);
 
         }
 
@@ -211,15 +214,15 @@ public class MoreFragment extends DialogFragment {
 
                                     long[] ids = new long[1];
                                     ids[0] = adapterMusicInfo.songId;
-                                    MusicPlayer.playNext(mContext, ids, -1);
+                                    HashMap<Long, MusicInfo> map = new HashMap<Long, MusicInfo>();
+                                    map.put(ids[0], adapterMusicInfo);
+                                    MusicPlayer.playNext(mContext, map, ids);
                                 }
                             }, 100);
 
                             dismiss();
                             break;
                         case 1:
-//                            long[] list = new long[1];
-//                            list[0] = adapterMusicInfo.songId;
                             ArrayList<MusicInfo> musicList = new ArrayList<MusicInfo>();
                             musicList.add(adapterMusicInfo);
                             AddNetPlaylistDialog.newInstance(musicList).show(getFragmentManager(), "add");
@@ -230,7 +233,7 @@ public class MoreFragment extends DialogFragment {
                             shareIntent.setAction(Intent.ACTION_SEND);
                             shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://" + adapterMusicInfo.data));
                             shareIntent.setType("audio/*");
-                            getActivity().startActivity(Intent.createChooser(shareIntent, getResources().getString(R.string.shared_to)));
+                            mContext.startActivity(Intent.createChooser(shareIntent, getResources().getString(R.string.shared_to)));
                             dismiss();
                             break;
                         case 3:
@@ -239,35 +242,31 @@ public class MoreFragment extends DialogFragment {
                                         @Override
                                         public void onClick(DialogInterface dialog, int which) {
 
-                                            Uri uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, adapterMusicInfo.songId);
-                                            mContext.getContentResolver().delete(uri, null, null);
+                                            try {
+                                                Uri uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, adapterMusicInfo.songId);
+                                                mContext.getContentResolver().delete(uri, null, null);
 
 
-                                            if (MusicPlayer.getCurrentAudioId() == adapterMusicInfo.songId) {
-                                                if (MusicPlayer.getQueueSize() == 0) {
-                                                    MusicPlayer.stop();
-                                                } else {
-                                                    MusicPlayer.next();
+                                                if (MusicPlayer.getCurrentAudioId() == adapterMusicInfo.songId) {
+                                                    if (MusicPlayer.getQueueSize() == 0) {
+                                                        MusicPlayer.stop();
+                                                    } else {
+                                                        MusicPlayer.next();
+                                                    }
+
                                                 }
 
+                                                mHandler.postDelayed(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        PlaylistsManager.getInstance(mContext).deleteMusic(mContext, adapterMusicInfo.songId);
+                                                        mContext.sendBroadcast(new Intent(IConstants.MUSIC_COUNT_CHANGED));
+                                                    }
+                                                }, 200);
+                                            } catch (Exception e) {
+                                                e.printStackTrace();
                                             }
 
-                                            mHandler.postDelayed(new Runnable() {
-                                                @Override
-                                                public void run() {
-                                                    PlaylistsManager.getInstance(mContext).deleteMusic(mContext, adapterMusicInfo.songId);
-                                                    mContext.sendBroadcast(new Intent(IConstants.MUSIC_COUNT_CHANGED));
-                                                }
-                                            }, 200);
-
-//                                            File file;
-//                                            file = new File(adapterMusicInfo.data);
-//                                            if (file.exists())
-//                                                file.delete();
-
-//                                                mContext.getApplicationContext().sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
-//                                                        Uri.parse("file://" + adapterMusicInfo.data)));
-//                                            mContext.sendBroadcast(new Intent(IConstants.MUSIC_COUNT_CHANGED));
                                             dismiss();
                                         }
                                     }).
@@ -282,9 +281,10 @@ public class MoreFragment extends DialogFragment {
                         case 4:
 
                             if (adapterMusicInfo.islocal) {
-                                new Thread(new Runnable() {
+                                new AsyncTask<Void, Void, Void>() {
+
                                     @Override
-                                    public void run() {
+                                    protected Void doInBackground(Void... params) {
                                         ArrayList<SearchArtistInfo> artistResults = new ArrayList<>();
                                         try {
 
@@ -313,14 +313,11 @@ public class MoreFragment extends DialogFragment {
                                             Intent intent = new Intent(mContext, ArtistDetailActivity.class);
                                             intent.putExtra("artistid", info.getArtist_id());
                                             intent.putExtra("artistname", info.getAuthor());
-//                                        intent.putExtra("albumid", info.getAlbum_id());
-//                                        intent.putExtra("albumart", info.getPic_small());
-//                                        intent.putExtra("albumname", info.getTitle());
-//                                        intent.putExtra("albumdetail",info.getAlbum_desc());
                                             mContext.startActivity(intent);
                                         }
+                                        return null;
                                     }
-                                }).start();
+                                }.execute();
                             } else {
 
                                 Intent intent = new Intent(mContext, ArtistDetailActivity.class);
@@ -333,20 +330,14 @@ public class MoreFragment extends DialogFragment {
                         case 5:
 
                             if (adapterMusicInfo.islocal) {
-                                new Thread(new Runnable() {
+                                new AsyncTask<Void, Void, Void>() {
+
                                     @Override
-                                    public void run() {
+                                    protected Void doInBackground(Void... params) {
                                         ArrayList<SearchAlbumInfo> albumResults = new ArrayList<SearchAlbumInfo>();
                                         try {
 
                                             JsonObject jsonObject = HttpUtil.getResposeJsonObject(BMA.Search.searchMerge(adapterMusicInfo.albumName, 1, 10)).get("result").getAsJsonObject();
-//                                        JsonObject artistObject =  jsonObject.get("artist_info").getAsJsonObject();
-//                                        JsonArray artistArray = artistObject.get("artist_list").getAsJsonArray();
-//                                        for (JsonElement o : artistArray) {
-//                                            SearchArtistInfo artistInfo =  MainApplication.gsonInstance().fromJson(o, SearchArtistInfo.class);
-//                                            artistResults.add(artistInfo);
-//                                        }
-                                            Log.e("search", jsonObject.toString());
                                             JsonObject albumObject = jsonObject.get("album_info").getAsJsonObject();
                                             JsonArray albumArray = albumObject.get("album_list").getAsJsonArray();
                                             for (JsonElement o : albumArray) {
@@ -367,7 +358,6 @@ public class MoreFragment extends DialogFragment {
 
                                         } else {
                                             SearchAlbumInfo info = albumResults.get(0);
-                                            Log.e("search", info.getAlbum_id() + "  " + info.getTitle());
                                             Intent intent = new Intent(mContext, AlbumsDetailActivity.class);
                                             intent.putExtra("albumid", info.getAlbum_id());
                                             intent.putExtra("albumart", info.getPic_small());
@@ -375,25 +365,21 @@ public class MoreFragment extends DialogFragment {
                                             intent.putExtra("albumdetail", info.getAlbum_desc());
                                             mContext.startActivity(intent);
                                         }
-
+                                        return null;
                                     }
-                                }).start();
+                                };
                             } else {
 
-                                Intent intent = new Intent(getActivity(), AlbumsDetailActivity.class);
+                                Intent intent = new Intent(mContext, AlbumsDetailActivity.class);
                                 intent.putExtra("albumid", adapterMusicInfo.albumId + "");
                                 intent.putExtra("albumart", adapterMusicInfo.albumData);
                                 intent.putExtra("albumname", adapterMusicInfo.albumName);
                                 mContext.startActivity(intent);
                             }
-
                             dismiss();
                             break;
                         case 6:
-                            if (playlistId != -1) {
-                                PlaylistsManager.getInstance(mContext).deleteMusicInfo(mContext, playlistId, adapterMusicInfo.songId);
-
-                            } else {
+                            if(adapterMusicInfo.islocal){
                                 new AlertDialog.Builder(mContext).setTitle(getResources().getString(R.string.sure_to_set_ringtone)).
                                         setPositiveButton(getResources().getString(R.string.sure), new DialogInterface.OnClickListener() {
                                             @Override
@@ -412,12 +398,14 @@ public class MoreFragment extends DialogFragment {
                                                 dialog.dismiss();
                                             }
                                         }).show();
+                            }else {
+
                             }
 
                             break;
                         case 7:
                             MusicDetailFragment detailFrament = MusicDetailFragment.newInstance(adapterMusicInfo);
-                            detailFrament.show(getActivity().getFragmentManager(), "detail");
+                            detailFrament.show(getActivity().getSupportFragmentManager(), "detail");
                             dismiss();
                             break;
                         default:
@@ -434,7 +422,7 @@ public class MoreFragment extends DialogFragment {
             public void onItemClick(View view, String data) {
                 switch (Integer.parseInt(data)) {
                     case 0:
-                        new Thread(new Runnable() {
+                        mHandler.postDelayed(new Runnable() {
                             @Override
                             public void run() {
                                 HashMap<Long, MusicInfo> infos = new HashMap<Long, MusicInfo>();
@@ -448,15 +436,10 @@ public class MoreFragment extends DialogFragment {
 
                                 MusicPlayer.playAll(infos, listid, 0, false);
                             }
-                        }).start();
+                        }, 60);
                         dismiss();
                         break;
                     case 1:
-//                        long[] queuelist = new long[list.size()];
-//                        for (int i = 0; i < list.size(); i++) {
-//                            queuelist[i] = list.get(i).songId;
-//                        }
-//                        AddPlaylistDialog.newInstance(queuelist).show(getFragmentManager(), "add");
                         AddNetPlaylistDialog.newInstance(list).show(getFragmentManager(), "add");
 
                         dismiss();
@@ -506,7 +489,7 @@ public class MoreFragment extends DialogFragment {
 //                            if (file.exists())
 //                                file.delete();
 //                            if (file.exists() == false) {
-//                                getActivity().sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
+//                                mContext.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
 //                                        Uri.parse("file://" + music.data)));
 //                            }
                         //  HandlerUtil.CommonHandler handler1 = new HandlerUtil.CommonHandler(mContext);
@@ -556,7 +539,7 @@ public class MoreFragment extends DialogFragment {
     public void onStart() {
         super.onStart();
         //设置fragment高度 、宽度
-        int dialogHeight = (int) (getActivity().getResources().getDisplayMetrics().heightPixels * heightPercent);
+        int dialogHeight = (int) (mContext.getResources().getDisplayMetrics().heightPixels * heightPercent);
         ;
 //        WindowManager wm = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
 //        Display display = wm.getDefaultDisplay();

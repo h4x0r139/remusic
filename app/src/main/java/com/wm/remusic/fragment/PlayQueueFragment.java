@@ -1,6 +1,5 @@
 package com.wm.remusic.fragment;
 
-import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -18,10 +17,9 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.bilibili.magicasakura.widgets.TintImageView;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import com.wm.remusic.R;
 import com.wm.remusic.dialog.AddNetPlaylistDialog;
+import com.wm.remusic.handler.HandlerUtil;
 import com.wm.remusic.info.MusicInfo;
 import com.wm.remusic.provider.MusicPlaybackState;
 import com.wm.remusic.recent.QueueLoader;
@@ -30,8 +28,6 @@ import com.wm.remusic.widget.DividerItemDecoration;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -41,7 +37,7 @@ import java.util.HashMap;
 /**
  * Created by wm on 2016/2/4.
  */
-public class PlayQueueFragment extends DialogFragment {
+public class PlayQueueFragment extends AttachDialogFragment {
 
     private RecyclerView.ItemDecoration itemDecoration;
     private PlaylistAdapter adapter;
@@ -49,18 +45,33 @@ public class PlayQueueFragment extends DialogFragment {
     private TextView playlistNumber, clearAll, addToPlaylist;
     private MusicInfo musicInfo;
     private int currentlyPlayingPosition = 0;
-    MusicPlaybackState musicPlaybackState;
+    private MusicPlaybackState musicPlaybackState;
     private RecyclerView recyclerView;  //弹出的activity列表
     private LinearLayoutManager layoutManager;
+    private Handler mHandler;
+    private PlayQuueuListener mQueueListener;
+    public interface PlayQuueuListener{
+        void onPlay(int position);
+    }
+
+    public void setQueueListener(PlayQuueuListener listener){
+        mQueueListener = listener;
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         //设置样式
         setStyle(DialogFragment.STYLE_NO_FRAME, R.style.CustomDatePickerDialog);
-        musicPlaybackState = MusicPlaybackState.getInstance(getContext());
+        musicPlaybackState = MusicPlaybackState.getInstance(mContext);
+        mHandler = HandlerUtil.getInstance(mContext);
     }
 
+    @Override
+    public void onStop() {
+        super.onStop();
+
+    }
 
     @Override
     public View onCreateView(final LayoutInflater inflater, ViewGroup container,
@@ -85,11 +96,6 @@ public class PlayQueueFragment extends DialogFragment {
         addToPlaylist.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-//                long[] list = new long[playlist.size()];
-//                for (int i = 0; i < playlist.size(); i++) {
-//                    list[i] = playlist.get(i).songId;
-//                }
-//                AddPlaylistDialog.newInstance(list).show(getFragmentManager(), "add");
                 AddNetPlaylistDialog.newInstance(playlist).show(getFragmentManager(), "add");
             }
         });
@@ -100,17 +106,20 @@ public class PlayQueueFragment extends DialogFragment {
             public void onClick(View v) {
                 MusicPlayer.clearQueue();
                 MusicPlayer.stop();
-                Intent intent = new Intent("com.wm.remusic.emptyplaylist");
-                intent.putExtra("showorhide", "hide");
-                getActivity().sendBroadcast(intent);
-                adapter.notifyDataSetChanged();
+                File file = new File(mContext.getCacheDir().getAbsolutePath() + "playlist");
+                if (file.exists()) {
+                    file.delete();
+                }
+                MusicPlaybackState.getInstance(mContext).clearQueue();
+                if (adapter != null)
+                    adapter.notifyDataSetChanged();
                 dismiss();
             }
         });
         recyclerView = (RecyclerView) view.findViewById(R.id.play_list);
-        layoutManager = new LinearLayoutManager(getActivity());
+        layoutManager = new LinearLayoutManager(mContext);
         recyclerView.setLayoutManager(layoutManager);
-
+        recyclerView.setHasFixedSize(true);
         new loadSongs().execute();
         return view;
     }
@@ -119,7 +128,7 @@ public class PlayQueueFragment extends DialogFragment {
     public void onStart() {
         super.onStart();
         //设置fragment高度 、宽度
-        int dialogHeight = (int) (getActivity().getResources().getDisplayMetrics().heightPixels * 0.6);
+        int dialogHeight = (int) (mContext.getResources().getDisplayMetrics().heightPixels * 0.6);
         getDialog().getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, dialogHeight);
         getDialog().setCanceledOnTouchOutside(true);
 
@@ -142,27 +151,22 @@ public class PlayQueueFragment extends DialogFragment {
 
         @Override
         protected Void doInBackground(Void... params) {
-            if (getActivity() != null) {
-                // playlist = QueueLoader.getQueueSongs(getActivity());
-
+            if (mContext != null) {
                 try {
-                    Gson gson = new Gson();
-                    FileInputStream fo = new FileInputStream(new File(getContext().getCacheDir().getAbsolutePath() + "playlist"));
-                    String c = readTextFromSDcard(fo);
-                    HashMap<Long, MusicInfo> play = gson.fromJson(c, new TypeToken<HashMap<Long, MusicInfo>>() {
-                    }.getType());
+//                    FileInputStream in = new FileInputStream(new File(getContext().getCacheDir().getAbsolutePath() + "playlist"));
+//                    String c = readTextFromSDcard(in);
+//                    HashMap<Long, MusicInfo> play = MainApplication.gsonInstance().fromJson(c, new TypeToken<HashMap<Long, MusicInfo>>() {
+//                    }.getType());
+                    HashMap<Long, MusicInfo> play = MusicPlayer.getPlayinfos();
                     if (play != null && play.size() > 0) {
                         long[] queue = MusicPlayer.getQueue();
                         int len = queue.length;
                         playlist = new ArrayList<>();
-
                         for (int i = 0; i < len; i++) {
                             playlist.add(play.get(queue[i]));
                         }
                     }
 
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -176,7 +180,7 @@ public class PlayQueueFragment extends DialogFragment {
             if (playlist != null && playlist.size() > 0) {
                 adapter = new PlaylistAdapter(playlist);
                 recyclerView.setAdapter(adapter);
-                itemDecoration = new DividerItemDecoration(getActivity(), DividerItemDecoration.VERTICAL_LIST);
+                itemDecoration = new DividerItemDecoration(mContext, DividerItemDecoration.VERTICAL_LIST);
                 recyclerView.addItemDecoration(itemDecoration);
                 playlistNumber.setText("播放列表（" + playlist.size() + "）");
 
@@ -207,7 +211,7 @@ public class PlayQueueFragment extends DialogFragment {
 
         @Override
         public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup viewGroup, int viewType) {
-            return new ItemViewHolder(LayoutInflater.from(getContext()).inflate(R.layout.fragment_playqueue_item, viewGroup, false));
+            return new ItemViewHolder(LayoutInflater.from(mContext).inflate(R.layout.fragment_playqueue_item, viewGroup, false));
         }
 
         @Override
@@ -251,13 +255,14 @@ public class PlayQueueFragment extends DialogFragment {
                 this.delete.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        long deleteId = playlist.get(getAdapterPosition()).songId;
+                        int a = getAdapterPosition();
+                        long deleteId = playlist.get(a).songId;
 
                         // musicPlaybackState.Delete(deleteId);
-                        notifyItemRemoved(getAdapterPosition());
+                        notifyItemRemoved(a);
                         MusicPlayer.removeTrack(deleteId);
 
-                        updateDataSet(QueueLoader.getQueueSongs(getActivity()));
+                        updateDataSet(QueueLoader.getQueueSongs(mContext));
                         if (playlist == null) {
                             MusicPlayer.stop();
                         }
@@ -278,23 +283,25 @@ public class PlayQueueFragment extends DialogFragment {
 
             @Override
             public void onClick(View v) {
-                final Handler handler = new Handler();
-                handler.postDelayed(new Runnable() {
+
+                mHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
+                        final int a = getAdapterPosition();
+                        if (a == -1) {
+                            return;
+                        }
                         long[] ids = new long[1];
-                        ids[0] = playlist.get(getAdapterPosition()).songId;
-                        MusicPlayer.setQueuePosition(getAdapterPosition());
-                        Handler handler1 = new Handler();
-                        handler1.postDelayed(new Runnable() {
-                            @Override
-                            public void run() {
-                                notifyItemChanged(currentlyPlayingPosition);
-                                notifyItemChanged(getAdapterPosition());
-                            }
-                        }, 50);
+                        ids[0] = playlist.get(a).songId;
+                        MusicPlayer.setQueuePosition(a);
+
+                        if(mQueueListener != null)
+                        mQueueListener.onPlay(a);
+
+                        notifyItemChanged(currentlyPlayingPosition);
+                        notifyItemChanged(a);
                     }
-                }, 100);
+                }, 70);
 
             }
         }

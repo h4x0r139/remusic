@@ -1,6 +1,7 @@
 package com.wm.remusic.downmusic;
 
 import android.content.Context;
+import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Environment;
 import android.widget.Toast;
@@ -13,6 +14,7 @@ import com.wm.remusic.json.MusicDetailInfo;
 import com.wm.remusic.json.MusicFileDownInfo;
 import com.wm.remusic.net.BMA;
 import com.wm.remusic.net.HttpUtil;
+import com.wm.remusic.uitl.IConstants;
 import com.wm.remusic.uitl.PreferencesUtility;
 
 import java.io.File;
@@ -22,76 +24,32 @@ import java.io.File;
  */
 public class Down {
 
-    public static void downMusic(final Context context, final String ids[], final String names[]) {
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                int le = ids.length;
-                for (int j = 0; j < le; j++) {
-                    try {
-                        JsonArray jsonArray = HttpUtil.getResposeJsonObject(BMA.Song.songInfo(ids[j]).trim()).get("songurl")
-                                .getAsJsonObject().get("url").getAsJsonArray();
-                        int len = jsonArray.size();
-
-                        int downloadBit = PreferencesUtility.getInstance(context).getDownMusicBit();
-                        MusicFileDownInfo musicFileDownInfo = null;
-                        for (int i = len - 1; i > -1; i--) {
-                            int bit = Integer.parseInt(jsonArray.get(i).getAsJsonObject().get("file_bitrate").toString());
-                            if (bit == downloadBit) {
-                                musicFileDownInfo = MainApplication.gsonInstance().fromJson(jsonArray.get(i), MusicFileDownInfo.class);
-                            } else if (bit < downloadBit && bit >= 64) {
-                                musicFileDownInfo = MainApplication.gsonInstance().fromJson(jsonArray.get(i), MusicFileDownInfo.class);
-                            }
-                        }
-
-                        if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
-                            File file = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/remusic/");
-                            if (!file.exists()) {
-                                file.mkdir();
-                            }
-                            DownloadTask task = new DownloadTask.Builder(context, musicFileDownInfo.getShow_link())
-                                    .setFileName(names[j])
-                                    .setSaveDirPath(Environment.getExternalStorageDirectory().getAbsolutePath() + "/remusic/").build();
-                            DownloadManager.getInstance(context).addDownloadTask(task);
-
-                        } else {
-                            Toast.makeText(context, "没有储存卡", Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-
-                }
-
-                Toast.makeText(context, "已经加入下载", Toast.LENGTH_SHORT).show();
-
-            }
-        }).start();
-    }
-
-    public static void downMusic(final Context context, final String id, final String name) {
+    public static void downMusic(final Context context, final String id, final String name, final String artist) {
 
 
         new AsyncTask<String, String, MusicFileDownInfo>() {
             @Override
             protected MusicFileDownInfo doInBackground(final String... name) {
-                JsonArray jsonArray = HttpUtil.getResposeJsonObject(BMA.Song.songInfo(id).trim()).get("songurl")
-                        .getAsJsonObject().get("url").getAsJsonArray();
-                int len = jsonArray.size();
+                try {
+                    JsonArray jsonArray = HttpUtil.getResposeJsonObject(BMA.Song.songInfo(id).trim()).get("songurl")
+                            .getAsJsonObject().get("url").getAsJsonArray();
+                    int len = jsonArray.size();
 
-                int downloadBit = PreferencesUtility.getInstance(context).getDownMusicBit();
-                MusicFileDownInfo musicFileDownInfo;
-                for (int i = len - 1; i > -1; i--) {
-                    int bit = Integer.parseInt(jsonArray.get(i).getAsJsonObject().get("file_bitrate").toString());
-                    if (bit == downloadBit) {
-                        musicFileDownInfo = MainApplication.gsonInstance().fromJson(jsonArray.get(i), MusicFileDownInfo.class);
-                        return musicFileDownInfo;
-                    } else if (bit < downloadBit && bit >= 64) {
-                        musicFileDownInfo = MainApplication.gsonInstance().fromJson(jsonArray.get(i), MusicFileDownInfo.class);
-                        return musicFileDownInfo;
+                    int downloadBit = PreferencesUtility.getInstance(context).getDownMusicBit();
+                    MusicFileDownInfo musicFileDownInfo;
+                    for (int i = len - 1; i > -1; i--) {
+                        int bit = Integer.parseInt(jsonArray.get(i).getAsJsonObject().get("file_bitrate").toString());
+                        if (bit == downloadBit) {
+                            musicFileDownInfo = MainApplication.gsonInstance().fromJson(jsonArray.get(i), MusicFileDownInfo.class);
+                            return musicFileDownInfo;
+                        } else if (bit < downloadBit && bit >= 64) {
+                            musicFileDownInfo = MainApplication.gsonInstance().fromJson(jsonArray.get(i), MusicFileDownInfo.class);
+                            return musicFileDownInfo;
+                        }
                     }
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
 
                 return null;
@@ -99,20 +57,17 @@ public class Down {
 
             @Override
             protected void onPostExecute(MusicFileDownInfo musicFileDownInfo) {
-
-                if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
-                    File file = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/remusic/");
-                    if (!file.exists()) {
-                        file.mkdir();
-                    }
-                    DownloadTask task = new DownloadTask.Builder(context, musicFileDownInfo.getShow_link())
-                            .setFileName(name)
-                            .setSaveDirPath(Environment.getExternalStorageDirectory().getAbsolutePath() + "/remusic/").build();
-                    DownloadManager.getInstance(context).addDownloadTask(task);
-
-                } else {
-                    Toast.makeText(context, "没有储存卡", Toast.LENGTH_SHORT).show();
-                    return;
+                if (musicFileDownInfo != null && musicFileDownInfo.getShow_link() != null) {
+                    Intent i = new Intent(DownService.ADD_DOWNTASK);
+                    i.setAction(DownService.ADD_DOWNTASK);
+                    i.putExtra("id", id);
+                    i.putExtra("name", name);
+                    i.putExtra("artist", artist);
+                    i.putExtra("url", musicFileDownInfo.getShow_link());
+                    i.setPackage(IConstants.PACKAGE);
+                    context.startService(i);
+                }else {
+                    Toast.makeText(context,"该歌曲没有下载连接",Toast.LENGTH_SHORT).show();
                 }
             }
         }.execute();

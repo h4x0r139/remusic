@@ -43,17 +43,15 @@ public class MainFragmentAdapter extends RecyclerView.Adapter<MainFragmentAdapte
     private boolean collectExpanded = true;
     private Context mContext;
     private ArrayList itemResults = new ArrayList();
+    private boolean isLoveList = true;
 
 
-    public MainFragmentAdapter(Context context, ArrayList list, ArrayList<Playlist> playlists) {
-        this.itemResults = new ArrayList();
+    public MainFragmentAdapter(Context context) {
         this.mContext = context;
-        this.itemResults = list;
-        this.playlists = playlists;
     }
 
     public void updateResults(ArrayList itemResults, ArrayList<Playlist> playlists, ArrayList<Playlist> netplaylists) {
-
+        isLoveList = true;
         this.itemResults = itemResults;
         this.playlists = playlists;
         this.netplaylists = netplaylists;
@@ -72,6 +70,11 @@ public class MainFragmentAdapter extends RecyclerView.Adapter<MainFragmentAdapte
                 ItemHolder ml0 = new ItemHolder(v0);
                 return ml0;
             case 1:
+                if(isLoveList){
+                    View v1 = LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.fragment_main_playlist_first_item, viewGroup, false);
+                    ItemHolder ml1 = new ItemHolder(v1);
+                    return ml1;
+                }
                 View v1 = LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.fragment_main_playlist_item, viewGroup, false);
                 ItemHolder ml1 = new ItemHolder(v1);
                 return ml1;
@@ -115,6 +118,7 @@ public class MainFragmentAdapter extends RecyclerView.Adapter<MainFragmentAdapte
                     itemHolder.songcount.setText(playlist.songCount + "首");
                 }
                 setOnPlaylistListener(itemHolder, i, playlist.id, playlist.albumArt, playlist.name);
+                isLoveList = false;
                 break;
             case 2:
                 itemHolder.sectionItem.setText("创建的歌单" + "(" + playlists.size() + ")");
@@ -136,13 +140,16 @@ public class MainFragmentAdapter extends RecyclerView.Adapter<MainFragmentAdapte
 
     @Override
     public int getItemCount() {
+        if(itemResults == null){
+            return 0;
+        }
         if (!createdExpanded && playlists != null) {
             itemResults.removeAll(playlists);
         }
         if (!collectExpanded) {
             itemResults.removeAll(netplaylists);
         }
-        return itemResults == null ? 0 : itemResults.size();
+        return itemResults.size();
     }
 
     private void setOnListener(ItemHolder itemHolder, final int position) {

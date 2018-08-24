@@ -1,7 +1,6 @@
 package com.wm.remusic.fragment;
 
 import android.content.ContentUris;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.media.RingtoneManager;
@@ -35,12 +34,13 @@ import com.wm.remusic.uitl.MusicUtils;
 import com.wm.remusic.widget.DividerItemDecoration;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 /**
  * Created by wm on 2016/1/31.
  */
-public class SimpleMoreFragment extends DialogFragment {
+public class SimpleMoreFragment extends AttachDialogFragment {
 
     private double heightPercent = 0.5;
     private TextView topTitle;
@@ -53,7 +53,6 @@ public class SimpleMoreFragment extends DialogFragment {
     private LinearLayoutManager layoutManager;
     private long args;
     private String musicName;
-    private Context mContext;
 
 
     public static SimpleMoreFragment newInstance(long id) {
@@ -84,7 +83,7 @@ public class SimpleMoreFragment extends DialogFragment {
         View view = inflater.inflate(R.layout.more_fragment, container);
         topTitle = (TextView) view.findViewById(R.id.pop_list_title);
         recyclerView = (RecyclerView) view.findViewById(R.id.pop_list);
-        layoutManager = new LinearLayoutManager(getActivity());
+        layoutManager = new LinearLayoutManager(mContext);
         recyclerView.setHasFixedSize(true);
         recyclerView.setLayoutManager(layoutManager);
         getList();
@@ -95,7 +94,7 @@ public class SimpleMoreFragment extends DialogFragment {
 
     //设置分割线
     private void setItemDecoration() {
-        RecyclerView.ItemDecoration itemDecoration = new DividerItemDecoration(getActivity(), DividerItemDecoration.VERTICAL_LIST);
+        RecyclerView.ItemDecoration itemDecoration = new DividerItemDecoration(mContext, DividerItemDecoration.VERTICAL_LIST);
         recyclerView.addItemDecoration(itemDecoration);
     }
 
@@ -109,7 +108,7 @@ public class SimpleMoreFragment extends DialogFragment {
         }
         topTitle.setText("歌曲：" + " " + musicName);
         setMusicInfo();
-        musicflowAdapter = new MusicFlowAdapter(getActivity(), mlistInfo, adapterMusicInfo);
+        musicflowAdapter = new MusicFlowAdapter(mContext, mlistInfo, adapterMusicInfo);
 
     }
 
@@ -129,7 +128,9 @@ public class SimpleMoreFragment extends DialogFragment {
 
                                         long[] ids = new long[1];
                                         ids[0] = adapterMusicInfo.songId;
-                                        MusicPlayer.playNext(mContext, ids, -1);
+                                        HashMap<Long, MusicInfo> map = new HashMap<Long, MusicInfo>();
+                                        map.put(ids[0], adapterMusicInfo);
+                                        MusicPlayer.playNext(mContext, map, ids);
                                     }
                                 }, 100);
                             }
@@ -146,7 +147,7 @@ public class SimpleMoreFragment extends DialogFragment {
                             shareIntent.setAction(Intent.ACTION_SEND);
                             shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://" + adapterMusicInfo.data));
                             shareIntent.setType("audio/*");
-                            getActivity().startActivity(Intent.createChooser(shareIntent, getResources().getString(R.string.shared_to)));
+                            mContext.startActivity(Intent.createChooser(shareIntent, getResources().getString(R.string.shared_to)));
                             dismiss();
                             break;
                         case 3:
@@ -221,7 +222,7 @@ public class SimpleMoreFragment extends DialogFragment {
                             break;
                         case 5:
                             MusicDetailFragment detailFrament = MusicDetailFragment.newInstance(adapterMusicInfo);
-                            detailFrament.show(getActivity().getFragmentManager(), "detail");
+                            detailFrament.show(getActivity().getSupportFragmentManager(), "detail");
                             dismiss();
                             break;
                         default:
@@ -250,14 +251,13 @@ public class SimpleMoreFragment extends DialogFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setStyle(DialogFragment.STYLE_NO_FRAME, R.style.CustomDatePickerDialog);
-        mContext = getContext();
     }
 
     @Override
     public void onStart() {
         super.onStart();
         //设置fragment高度 、宽度
-        int dialogHeight = (int) (getActivity().getResources().getDisplayMetrics().heightPixels * heightPercent);
+        int dialogHeight = (int) (mContext.getResources().getDisplayMetrics().heightPixels * heightPercent);
         ;
 //        WindowManager wm = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
 //        Display display = wm.getDefaultDisplay();

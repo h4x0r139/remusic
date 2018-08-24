@@ -1,17 +1,17 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 23
-    buildToolsVersion "23.0.3"
+    compileSdkVersion project.compileSdkVersion
+    buildToolsVersion project.buildToolsVersion
 
     defaultConfig {
         applicationId "com.wm.remusic"
-        minSdkVersion 11
-        targetSdkVersion 23
+        minSdkVersion project.minSdkVersion
+        targetSdkVersion project.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "1.01"
         //start
-        renderscriptTargetApi 17
+        renderscriptTargetApi project.targetSdkVersion
         renderscriptSupportModeEnabled true
         //end
     }
@@ -21,19 +21,25 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+
+    sourceSets.main {
+        jniLibs.srcDirs = ['src/main/jniLibs']
+    }
 }
 
 dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
+    compile fileTree(include: ['*.jar'], dir: 'libs')
     testCompile 'junit:junit:4.12'
-    compile 'com.android.support:appcompat-v7:23.3.0'
-    compile 'com.android.support:design:23.3.0'
-    compile 'com.android.support:percent:23.3.0'
+    compile 'com.android.support:appcompat-v7:'+project.supportLib
+    compile 'com.android.support:design:'+project.supportLib
     compile 'com.facebook.fresco:fresco:0.9.0'
     compile 'com.squareup.okhttp:okhttp:2.7.2'
     compile 'com.squareup.okhttp:okhttp-urlconnection:2.7.2'
     compile 'com.squareup.retrofit:retrofit:1.9.0'
-//    compile 'com.readystatesoftware.systembartint:systembartint:1.0.3'
+    //    compile 'com.readystatesoftware.systembartint:systembartint:1.0.3'
     compile 'com.github.ksoichiro:android-observablescrollview:1.6.0'
-    compile 'com.bilibili:magicasakura:0.1.1@arr'
+    compile 'com.github.promeg:tinypinyin:1.0.0'
+    compile files('libs/activation.jar')
+    compile files('libs/additionnal.jar')
+    compile files('libs/mail.jar')
 }

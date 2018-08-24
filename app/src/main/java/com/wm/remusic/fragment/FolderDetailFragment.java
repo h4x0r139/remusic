@@ -18,6 +18,7 @@ import android.widget.TextView;
 import com.bilibili.magicasakura.widgets.TintImageView;
 import com.wm.remusic.R;
 import com.wm.remusic.activity.SelectActivity;
+import com.wm.remusic.handler.HandlerUtil;
 import com.wm.remusic.info.MusicInfo;
 import com.wm.remusic.service.MusicPlayer;
 import com.wm.remusic.uitl.CommonUtils;
@@ -67,18 +68,18 @@ public class FolderDetailFragment extends BaseFragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_common, container, false);
 
-        layoutManager = new LinearLayoutManager(getActivity());
+        layoutManager = new LinearLayoutManager(mContext);
         recyclerView = (RecyclerView) view.findViewById(R.id.recyclerview);
         recyclerView.setLayoutManager(layoutManager);
         folderDetailAdapter = new FolderDetailAdapter(null);
         recyclerView.setAdapter(folderDetailAdapter);
         setItemDecoration();
         reloadAdapter();
-
+        recyclerView.setHasFixedSize(true);
         toolbar = (Toolbar) view.findViewById(R.id.toolbar);
-        ((AppCompatActivity) getActivity()).setSupportActionBar(toolbar);
-        toolbar.setPadding(0, CommonUtils.getStatusHeight(getActivity()), 0, 0);
-        ab = ((AppCompatActivity) getActivity()).getSupportActionBar();
+        ((AppCompatActivity) mContext).setSupportActionBar(toolbar);
+        toolbar.setPadding(0, CommonUtils.getStatusHeight(mContext), 0, 0);
+        ab = ((AppCompatActivity) mContext).getSupportActionBar();
         ab.setHomeAsUpIndicator(R.drawable.actionbar_back);
         ab.setDisplayHomeAsUpEnabled(true);
         String folder = folder_path.substring(folder_path.lastIndexOf(File.separator), folder_path.length());
@@ -86,7 +87,7 @@ public class FolderDetailFragment extends BaseFragment {
         toolbar.setNavigationOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                getActivity().onBackPressed();
+                mContext.onBackPressed();
             }
         });
 
@@ -102,7 +103,7 @@ public class FolderDetailFragment extends BaseFragment {
 
     //设置分割线
     private void setItemDecoration() {
-        RecyclerView.ItemDecoration itemDecoration = new DividerItemDecoration(getActivity(), DividerItemDecoration.VERTICAL_LIST);
+        RecyclerView.ItemDecoration itemDecoration = new DividerItemDecoration(mContext, DividerItemDecoration.VERTICAL_LIST);
         recyclerView.addItemDecoration(itemDecoration);
     }
 
@@ -111,7 +112,7 @@ public class FolderDetailFragment extends BaseFragment {
         new AsyncTask<Void, Void, Void>() {
             @Override
             protected Void doInBackground(final Void... unused) {
-                List<MusicInfo> albumList = MusicUtils.queryMusic(getActivity(), null, folder_path, IConstants.START_FROM_FOLDER);
+                List<MusicInfo> albumList = MusicUtils.queryMusic(mContext, folder_path, IConstants.START_FROM_FOLDER);
                 folderDetailAdapter.updateDataSet(albumList);
                 return null;
             }
@@ -161,9 +162,9 @@ public class FolderDetailFragment extends BaseFragment {
                 ((CommonItemViewHolder) holder).select.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        Intent intent = new Intent(getActivity(), SelectActivity.class);
+                        Intent intent = new Intent(mContext, SelectActivity.class);
                         intent.putParcelableArrayListExtra("ids", (ArrayList) mList);
-                        getActivity().startActivity(intent);
+                        mContext.startActivity(intent);
                     }
                 });
             }
@@ -204,7 +205,7 @@ public class FolderDetailFragment extends BaseFragment {
             //播放文件夹
             @Override
             public void onClick(View v) {
-                new Thread(new Runnable() {
+                HandlerUtil.getInstance(mContext).postDelayed(new Runnable() {
                     @Override
                     public void run() {
                         long[] list = new long[mList.size()];
@@ -218,7 +219,7 @@ public class FolderDetailFragment extends BaseFragment {
                         }
                         MusicPlayer.playAll(infos, list, 0, false);
                     }
-                }).start();
+                },70);
             }
 
 
@@ -252,8 +253,7 @@ public class FolderDetailFragment extends BaseFragment {
             //播放歌曲
             @Override
             public void onClick(View v) {
-                //// TODO: 2016/1/19
-                new Thread(new Runnable() {
+                HandlerUtil.getInstance(mContext).postDelayed(new Runnable() {
                     @Override
                     public void run() {
                         long[] list = new long[mList.size()];
@@ -265,9 +265,10 @@ public class FolderDetailFragment extends BaseFragment {
                             info.albumData = MusicUtils.getAlbumArtUri(info.albumId) + "";
                             infos.put(list[i], mList.get(i));
                         }
-                        MusicPlayer.playAll(infos, list, getAdapterPosition() - 1, false);
+                        if (getAdapterPosition() > 0)
+                            MusicPlayer.playAll(infos, list, getAdapterPosition() - 1, false);
                     }
-                }).start();
+                }, 70);
             }
 
         }

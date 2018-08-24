@@ -12,7 +12,6 @@ import android.support.v4.view.ViewPager;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBar;
 import android.support.v7.widget.Toolbar;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -26,14 +25,13 @@ import android.widget.Toast;
 import com.bilibili.magicasakura.utils.ThemeUtils;
 import com.wm.remusic.R;
 import com.wm.remusic.adapter.MenuItemAdapter;
-import com.wm.remusic.fragment.BitSetFragment;
 import com.wm.remusic.dialog.CardPickerDialog;
+import com.wm.remusic.fragment.BitSetFragment;
 import com.wm.remusic.fragment.MainFragment;
 import com.wm.remusic.fragment.TimingFragment;
 import com.wm.remusic.fragmentnet.TabNetPagerFragment;
 import com.wm.remusic.handler.HandlerUtil;
 import com.wm.remusic.service.MusicPlayer;
-import com.wm.remusic.uitl.IConstants;
 import com.wm.remusic.uitl.ThemeHelper;
 import com.wm.remusic.widget.CustomViewPager;
 import com.wm.remusic.widget.SplashScreen;
@@ -47,67 +45,34 @@ public class MainActivity extends BaseActivity implements CardPickerDialog.Click
     private ArrayList<ImageView> tabs = new ArrayList<>();
     private DrawerLayout drawerLayout;
     private ListView mLvLeftMenu;
+    private long time = 0;
+    private SplashScreen splashScreen;
 
     public void onCreate(Bundle savedInstanceState) {
-        final SplashScreen splashScreen = new SplashScreen(this);
+        splashScreen = new SplashScreen(this);
         splashScreen.show(R.drawable.art_login_bg,
                 SplashScreen.SLIDE_LEFT);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        HandlerUtil.getInstance(this).postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                splashScreen.removeSplashScreen();
-            }
-        }, 2000);
-
         getWindow().setBackgroundDrawableResource(R.color.background_material_light_1);
-
-        setToolBar();
 
         barnet = (ImageView) findViewById(R.id.bar_net);
         barmusic = (ImageView) findViewById(R.id.bar_music);
         barfriends = (ImageView) findViewById(R.id.bar_friends);
         search = (ImageView) findViewById(R.id.bar_search);
         barmusic = (ImageView) findViewById(R.id.bar_music);
-
         drawerLayout = (DrawerLayout) findViewById(R.id.fd);
         mLvLeftMenu = (ListView) findViewById(R.id.id_lv_left_menu);
 
+        setToolBar();
         setViewPager();
         setUpDrawer();
-
-//        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawerLayout, null, R.string.app_name, R.string.search);
-//        drawerLayout.setDrawerListener(toggle);
-//        toggle.syncState();
-//
-//        final NavigationView navigationview = (NavigationView) findViewById(R.id.nav);
-//        navigationview.setClickable(true);
-//      //  navigationview.setNavigationItemSelectedListener(this);
-//        getWindow().setBackgroundDrawableResource(R.color.background_material_light_1);
-//        View headerView = navigationview.getHeaderView(2);
-//        RelativeLayout relativeLayout = (RelativeLayout) findViewById(R.id.navigation_view);
-//        relativeLayout.setSelected(true);
-//        LinearLayout timePlay = (LinearLayout) findViewById(R.id.timing_play);
-//        LinearLayout downBit = (LinearLayout) findViewById(R.id.down_bit);
-//        TextView exit = (TextView) findViewById(R.id.action_exit);
-//
-//        timePlay.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                TimingFragment fragment = new TimingFragment();
-//                fragment.show(getSupportFragmentManager(), "timing");
-//                drawerLayout.closeDrawers();
-//            }
-//        });
-//
-//        downBit.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//
-//            }
-//        });
-
+        HandlerUtil.getInstance(this).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                splashScreen.removeSplashScreen();
+            }
+        }, 3000);
 
     }
 
@@ -153,9 +118,7 @@ public class MainActivity extends BaseActivity implements CardPickerDialog.Click
         barnet.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (customViewPager != null) {
-                    customViewPager.setCurrentItem(0);
-                }
+                customViewPager.setCurrentItem(0);
             }
         });
         barmusic.setOnClickListener(new View.OnClickListener() {
@@ -232,9 +195,7 @@ public class MainActivity extends BaseActivity implements CardPickerDialog.Click
 
     @Override
     public void onConfirm(int currentTheme) {
-        Log.e("theme", "onconfirm");
         if (ThemeHelper.getTheme(MainActivity.this) != currentTheme) {
-            Log.e("theme", "onconfirm end");
             ThemeHelper.setTheme(MainActivity.this, currentTheme);
             ThemeUtils.refreshUI(MainActivity.this, new ThemeUtils.ExtraRefreshable() {
                         @Override
@@ -244,18 +205,17 @@ public class MainActivity extends BaseActivity implements CardPickerDialog.Click
                                 final MainActivity context = MainActivity.this;
                                 ActivityManager.TaskDescription taskDescription = new ActivityManager.TaskDescription(null, null, ThemeUtils.getThemeAttrColor(context, android.R.attr.colorPrimary));
                                 setTaskDescription(taskDescription);
-                                getWindow().setStatusBarColor(ThemeUtils.getColorById(context, R.color.theme_color_primary_dark));
+                                getWindow().setStatusBarColor(ThemeUtils.getColorById(context, R.color.theme_color_primary));
                             }
                         }
 
                         @Override
                         public void refreshSpecificView(View view) {
-                            //TODO: will do this for each traversal
                         }
                     }
             );
         }
-        sendBroadcast(new Intent(IConstants.CHANGE_THEME));
+        changeTheme();
     }
 
     static class CustomViewPagerAdapter extends FragmentPagerAdapter {
@@ -282,36 +242,6 @@ public class MainActivity extends BaseActivity implements CardPickerDialog.Click
     }
 
 
-//    @Override
-//    public boolean onNavigationItemSelected(MenuItem item) {
-//        // Handle navigation view item clicks here.
-//        switch (item.getItemId()) {
-//
-//            case R.id.timing_play:
-//                TimingFragment fragment = new TimingFragment();
-//                fragment.show(getSupportFragmentManager(), "timing");
-//                break;
-//            case R.id.action_exit:// 退出
-//
-//                if (MusicPlayer.isPlaying()) {
-//                    MusicPlayer.playOrPause();
-//                }
-//                unbindService();
-//                finish();
-//
-//            case R.id.down_bit:
-//                BitSetFragment bfragment = new BitSetFragment();
-//                bfragment.show(getSupportFragmentManager(), "bitset");
-//
-//                break;
-//
-//        }
-//
-//        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.fd);
-//        drawer.closeDrawer(GravityCompat.START);
-//        return true;
-//    }
-
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         // handle item selection
@@ -325,33 +255,11 @@ public class MainActivity extends BaseActivity implements CardPickerDialog.Click
         }
     }
 
-
-//    @Override
-//    public void down(String key) {
-//        // 字母索引被按下时回调
-//        if (map.get(key) != null) {
-//            lv.setSelectionFromTop(map.get(key), 0);
-//
-//            text_select.setText(key);
-//        }
-//        Iv_select_bg.setVisibility(View.VISIBLE);
-//    }
-//
-//    @Override
-//    public void up() {
-//        // 字母索引被松开时回调
-//        Iv_select_bg.setVisibility(View.GONE);
-//        text_select.setText(null);
-//    }
-//
-//    @Override
-//    public void move(String key) {
-//        // 字母索引被按下并移动时回调
-//        down(key);
-//    }
-
-
-    long time = 0;
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        splashScreen.removeSplashScreen();
+    }
 
     /**
      * 双击返回桌面
@@ -375,12 +283,21 @@ public class MainActivity extends BaseActivity implements CardPickerDialog.Click
     }
 
     @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        List<Fragment> fragments = getSupportFragmentManager().getFragments();
+        if (fragments != null) {
+            for (Fragment fragment : fragments) {
+                if (fragment != null) {
+                    fragment.onRequestPermissionsResult(requestCode,permissions,grantResults);
+                }
+            }
+        }
+    }
+
+    @Override
     public void onBackPressed() {
         super.onBackPressed();
-//        Intent startMain = new Intent(Intent.ACTION_MAIN);
-//        startMain.addCategory(Intent.CATEGORY_HOME);
-//        startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-//        startActivity(startMain);
 //        moveTaskToBack(true);
         // System.exit(0);
         // finish();

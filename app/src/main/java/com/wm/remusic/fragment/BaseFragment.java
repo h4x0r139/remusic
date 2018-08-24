@@ -1,70 +1,72 @@
 package com.wm.remusic.fragment;
 
-import android.content.BroadcastReceiver;
+import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
+import android.os.Bundle;
+import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 
-import com.wm.remusic.service.MediaService;
-import com.wm.remusic.uitl.IConstants;
+import com.wm.remusic.MainApplication;
+import com.wm.remusic.activity.BaseActivity;
+import com.wm.remusic.activity.MusicStateListener;
 
 /**
  * Created by wm on 2016/3/17.
  */
-public class BaseFragment extends Fragment {
+public class BaseFragment extends Fragment implements MusicStateListener {
 
-    //接受广播
-    private BroadcastReceiver mStatusListener = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if (action.equals(MediaService.META_CHANGED)) {
-                reloadAdapter();
-                updateTrackInfo();
-            } else if (action.equals(IConstants.MUSIC_COUNT_CHANGED)) {
-                reloadAdapter();
-            } else if (action.equals(IConstants.PLAYLIST_COUNT_CHANGED)) {
-                reloadAdapter();
-            } else if (action.equals(MediaService.TRACK_PREPARED)) {
-                updateTime();
-            } else if (action.equals(IConstants.CHANGE_THEME)){
-                changeTheme();
-            }
-        }
-    };
+    public Activity mContext;
+
+    @Override
+    public void onAttach(Activity activity){
+        super.onAttach(activity);
+        this.mContext = activity;
+    }
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+    }
 
     @Override
     public void onResume() {
         super.onResume();
-        IntentFilter f = new IntentFilter();
-        f.addAction(MediaService.META_CHANGED);
-        f.addAction(IConstants.MUSIC_COUNT_CHANGED);
-        f.addAction(IConstants.PLAYLIST_COUNT_CHANGED);
-        f.addAction(MediaService.TRACK_PREPARED);
-        f.addAction(IConstants.CHANGE_THEME);
-        getActivity().registerReceiver(mStatusListener, f);
+        ((BaseActivity) getActivity()).setMusicStateListenerListener(this);
+        reloadAdapter();
     }
-
 
     @Override
-    public void onPause() {
-        super.onPause();
-        getActivity().unregisterReceiver(mStatusListener);
+    public void onStop() {
+        super.onStop();
+        ((BaseActivity) getActivity()).removeMusicStateListenerListener(this);
     }
 
-    public void reloadAdapter() {
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+
     }
 
+    @Override
     public void updateTrackInfo() {
+
     }
 
+    @Override
     public void updateTime() {
 
     }
 
-    public void changeTheme(){
+    @Override
+    public void changeTheme() {
 
     }
+
+    @Override
+    public void reloadAdapter() {
+
+    }
+
 
 }

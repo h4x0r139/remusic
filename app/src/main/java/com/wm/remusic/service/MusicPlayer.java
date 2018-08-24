@@ -386,6 +386,17 @@ public class MusicPlayer {
         return sEmptyList;
     }
 
+    public static final HashMap<Long, MusicInfo> getPlayinfos() {
+        try {
+            if (mService != null) {
+                return (HashMap<Long, MusicInfo>) mService.getPlayinfos();
+            } else {
+            }
+        } catch (final RemoteException ignored) {
+        }
+        return null;
+    }
+
     public static final long getQueueItemAtPosition(int position) {
         try {
             if (mService != null) {
@@ -487,7 +498,7 @@ public class MusicPlayer {
         }
     }
 
-    public static void playAll(final HashMap<Long, MusicInfo> infos, final long[] list, int position, final boolean forceShuffle) {
+    public static synchronized void playAll(final HashMap<Long, MusicInfo> infos, final long[] list, int position, final boolean forceShuffle) {
         if (list == null || list.length == 0 || mService == null) {
             return;
         }
@@ -524,7 +535,7 @@ public class MusicPlayer {
         }
     }
 
-    public static void playNext(Context context, final long[] list, final long sourceIde) {
+    public static void playNext(Context context, final HashMap<Long, MusicInfo> map, final long[] list) {
         if (mService == null) {
             return;
         }
@@ -553,7 +564,7 @@ public class MusicPlayer {
 //                }
 //            }
 
-            mService.enqueue(list, MediaService.NEXT);
+            mService.enqueue(list, map, MediaService.NEXT);
 
             Toast.makeText(context, R.string.next_play, Toast.LENGTH_SHORT).show();
         } catch (final RemoteException ignored) {
@@ -681,7 +692,9 @@ public class MusicPlayer {
     }
 
     public static void clearQueue() {
+
         try {
+            if(mService != null)
             mService.removeTracks(0, Integer.MAX_VALUE);
         } catch (final RemoteException ignored) {
         }
@@ -692,7 +705,7 @@ public class MusicPlayer {
             return;
         }
         try {
-            mService.enqueue(list, MediaService.LAST);
+            mService.enqueue(list, null, MediaService.LAST);
             //final String message = makeLabel(context, R.plurals.NNNtrackstoqueue, list.length);
             //Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
         } catch (final RemoteException ignored) {

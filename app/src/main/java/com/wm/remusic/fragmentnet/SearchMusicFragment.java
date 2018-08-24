@@ -1,6 +1,7 @@
 package com.wm.remusic.fragmentnet;
 
 import android.content.DialogInterface;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
@@ -17,6 +18,7 @@ import com.google.gson.JsonObject;
 import com.wm.remusic.MainApplication;
 import com.wm.remusic.R;
 import com.wm.remusic.downmusic.Down;
+import com.wm.remusic.fragment.AttachFragment;
 import com.wm.remusic.info.MusicInfo;
 import com.wm.remusic.json.MusicDetailInfo;
 import com.wm.remusic.json.SearchSongInfo;
@@ -31,7 +33,7 @@ import java.util.HashMap;
 /**
  * Created by wm on 2016/5/18.
  */
-public class SearchMusicFragment extends Fragment {
+public class SearchMusicFragment extends AttachFragment {
 
     private MusicAdapter mAdapter;
     private ArrayList<SearchSongInfo> songInfos;
@@ -56,11 +58,12 @@ public class SearchMusicFragment extends Fragment {
         }
 
         recyclerView = (RecyclerView) view.findViewById(R.id.recyclerview);
-        layoutManager = new LinearLayoutManager(getActivity());
+        layoutManager = new LinearLayoutManager(mContext);
         recyclerView.setLayoutManager(layoutManager);
         mAdapter = new MusicAdapter(songInfos);
         recyclerView.setAdapter(mAdapter);
-        recyclerView.addItemDecoration(new DividerItemDecoration(getActivity(), DividerItemDecoration.VERTICAL_LIST));
+        recyclerView.setHasFixedSize(true);
+        recyclerView.addItemDecoration(new DividerItemDecoration(mContext, DividerItemDecoration.VERTICAL_LIST));
 
         return view;
     }
@@ -152,15 +155,15 @@ public class SearchMusicFragment extends Fragment {
                     @Override
                     public void onClick(View v) {
                         final SearchSongInfo model = mList.get(getAdapterPosition());
-                        new AlertDialog.Builder(getActivity()).setTitle("要下载音乐吗").
-                                setPositiveButton(getActivity().getString(R.string.sure), new DialogInterface.OnClickListener() {
+                        new AlertDialog.Builder(mContext).setTitle("要下载音乐吗").
+                                setPositiveButton(mContext.getString(R.string.sure), new DialogInterface.OnClickListener() {
                                     @Override
                                     public void onClick(DialogInterface dialog, int which) {
-                                        Down.downMusic(MainApplication.context, model.getSong_id() + "", model.getTitle());
+                                        Down.downMusic(MainApplication.context, model.getSong_id() + "", model.getTitle(), model.getAuthor());
                                         dialog.dismiss();
                                     }
                                 }).
-                                setNegativeButton(getActivity().getString(R.string.cancel), new DialogInterface.OnClickListener() {
+                                setNegativeButton(mContext.getString(R.string.cancel), new DialogInterface.OnClickListener() {
                                     @Override
                                     public void onClick(DialogInterface dialog, int which) {
                                         dialog.dismiss();
@@ -172,9 +175,10 @@ public class SearchMusicFragment extends Fragment {
                     @Override
                     public void onClick(View v) {
                         final SearchSongInfo model = mList.get(getAdapterPosition());
-                        new Thread(new Runnable() {
+                        new AsyncTask<Void,Void,Void>(){
+
                             @Override
-                            public void run() {
+                            protected Void doInBackground(Void... params) {
                                 MusicInfo musicInfo = new MusicInfo();
                                 try {
                                     MusicDetailInfo info = null;
@@ -201,8 +205,9 @@ public class SearchMusicFragment extends Fragment {
                                 list[0] = musicInfo.songId;
                                 infos.put(list[0], musicInfo);
                                 MusicPlayer.playAll(infos, list, 0, false);
+                                return null;
                             }
-                        }).start();
+                        }.execute();
                     }
                 });
 

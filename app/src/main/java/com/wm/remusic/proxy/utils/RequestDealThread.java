@@ -123,7 +123,7 @@ public class RequestDealThread extends Thread {
                     : false;
 
 			/*
-			 * 如果缓存足够，且本地有文件长度，则直接发送缓存,不发送请求。。。。。。。。。。。。。。。。。。。
+             * 如果缓存足够，且本地有文件长度，则直接发送缓存,不发送请求。。。。。。。。。。。。。。。。。。。
 			 * 如果缓存足够，本地没有文件长度，则发送请求，使用ResponseHeader，返回缓存,!不接收ResponseContent
 			 * 如果缓存不足，则发送请求，使用ResponseHeader，返回缓存，!返回Response Content
 			 */
@@ -134,7 +134,7 @@ public class RequestDealThread extends Thread {
             // 缓存不够。或者数据库没有文件大小
             else {
                 HttpURLConnection realResponse = null;
-				/*
+                /*
 				 * 返回Header和Cache
 				 */
                 // 如果数据库没有存文件大小，则获取（处理数据库没有文件大小的情况）

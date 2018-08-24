@@ -5,9 +5,11 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 
+import com.wm.remusic.MainApplication;
 import com.wm.remusic.info.MusicInfo;
 import com.wm.remusic.service.MusicTrack;
 import com.wm.remusic.uitl.IConstants;
+import com.wm.remusic.uitl.MusicUtils;
 
 import java.util.ArrayList;
 
@@ -53,7 +55,7 @@ public class PlaylistsManager {
         onCreate(db);
     }
 
-    public synchronized void Insert(Context context, long playlistid, long id, int order) {
+    public synchronized void insert(Context context, long playlistid, long id, int order) {
         ArrayList<MusicTrack> m = getPlaylist(playlistid);
         for (int i = 0; i < m.size(); i++) {
             if (m.get(i).mId == id)
@@ -78,12 +80,48 @@ public class PlaylistsManager {
 
     }
 
+    public synchronized void insertMusic(Context context, long playlistid, MusicInfo info) {
+        final SQLiteDatabase database = mMusicDatabase.getWritableDatabase();
+        database.beginTransaction();
+        try {
+            ContentValues values = new ContentValues(11);
+            values.put(PlaylistsColumns.PLAYLIST_ID, playlistid);
+            values.put(PlaylistsColumns.TRACK_ID, info.songId);
+            values.put(PlaylistsColumns.TRACK_ORDER, getPlaylist(playlistid).size());
+            values.put(PlaylistsColumns.TRACK_NAME, info.musicName);
+            values.put(PlaylistsColumns.ALBUM_ID, info.albumId);
+            values.put(PlaylistsColumns.ALBUM_NAME, info.albumName);
+            values.put(PlaylistsColumns.ALBUM_ART, info.albumData);
+            values.put(PlaylistsColumns.ARTIST_NAME, info.artist);
+            values.put(PlaylistsColumns.ARTIST_ID, info.artistId);
+            values.put(PlaylistsColumns.PATH, info.data);
+            values.put(PlaylistsColumns.IS_LOCAL, info.islocal);
+            database.insertWithOnConflict(PlaylistsColumns.NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+            database.setTransactionSuccessful();
+        } finally {
+            database.endTransaction();
+        }
+
+        PlaylistInfo playlistInfo = PlaylistInfo.getInstance(context);
+        String albumart = info.albumData;
+        if (info.islocal) {
+            if (albumart.equals(MusicUtils.getAlbumdata(MainApplication.context, info.songId))) {
+                playlistInfo.update(playlistid, getPlaylist(playlistid).size(), info.albumData);
+            } else {
+                playlistInfo.update(playlistid, getPlaylist(playlistid).size());
+            }
+        } else if (!albumart.isEmpty()) {
+            playlistInfo.update(playlistid, getPlaylist(playlistid).size(), info.albumData);
+        } else {
+            playlistInfo.update(playlistid, getPlaylist(playlistid).size());
+        }
+
+    }
+
     public synchronized void insertLists(Context context, long playlistid, ArrayList<MusicInfo> musicInfos) {
         final SQLiteDatabase database = mMusicDatabase.getWritableDatabase();
         database.beginTransaction();
         int len = musicInfos.size();
-        ArrayList<MusicTrack> m = getPlaylist(playlistid);
-
         try {
             for (int i = 0; i < len; i++) {
                 MusicInfo info = musicInfos.get(i);
@@ -103,12 +141,34 @@ public class PlaylistsManager {
             }
 
             database.setTransactionSuccessful();
+        } catch (Exception e) {
+            e.printStackTrace();
         } finally {
             database.endTransaction();
         }
 
         PlaylistInfo playlistInfo = PlaylistInfo.getInstance(context);
-        playlistInfo.update(playlistid, getPlaylist(playlistid).size());
+        String albumart = null;
+        for (int i = len - 1; i >= 0; i--) {
+            MusicInfo info = musicInfos.get(i);
+            albumart = info.albumData;
+            if (info.islocal) {
+                String art = MusicUtils.getAlbumdata(MainApplication.context, info.songId);
+                if (art != null) {
+                    break;
+                } else {
+                    albumart = null;
+                }
+            } else if (!albumart.isEmpty()) {
+                break;
+            }
+
+        }
+        if (albumart != null) {
+            playlistInfo.update(playlistid, getPlaylist(playlistid).size(), albumart);
+        } else {
+            playlistInfo.update(playlistid, getPlaylist(playlistid).size());
+        }
 
 
     }
@@ -170,7 +230,6 @@ public class PlaylistsManager {
         }
 
     }
-
 
     public void removeItem(Context context, final long playlistId, long songId) {
         final SQLiteDatabase database = mMusicDatabase.getWritableDatabase();
@@ -258,6 +317,34 @@ public class PlaylistsManager {
         database.delete(PlaylistsColumns.NAME, null, null);
     }
 
+    public long[] getPlaylistIds(final long playlistid) {
+        long[] results = null;
+
+        Cursor cursor = null;
+        try {
+            cursor = mMusicDatabase.getReadableDatabase().query(PlaylistsColumns.NAME, null,
+                    PlaylistsColumns.PLAYLIST_ID + " = " + String.valueOf(playlistid), null, null, null, PlaylistsColumns.TRACK_ORDER + " ASC ", null);
+            if (cursor != null) {
+                int len = cursor.getCount();
+                results = new long[len];
+                if (cursor.moveToFirst()) {
+                    for (int i = 0; i < len; i++) {
+                        results[i] = cursor.getLong(1);
+                        cursor.moveToNext();
+                    }
+
+                }
+            }
+
+            return results;
+
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+                cursor = null;
+            }
+        }
+    }
 
     public ArrayList<MusicTrack> getPlaylist(final long playlistid) {
         ArrayList<MusicTrack> results = new ArrayList<>();

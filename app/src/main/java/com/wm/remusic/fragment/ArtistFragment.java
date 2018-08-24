@@ -7,6 +7,8 @@ import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.SimpleItemAnimator;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -24,12 +26,16 @@ import com.wm.remusic.lastfmapi.callbacks.ArtistInfoListener;
 import com.wm.remusic.lastfmapi.models.ArtistQuery;
 import com.wm.remusic.lastfmapi.models.LastfmArtist;
 import com.wm.remusic.service.MusicPlayer;
+import com.wm.remusic.uitl.Comparator.ArtistComparator;
 import com.wm.remusic.uitl.IConstants;
 import com.wm.remusic.uitl.MusicUtils;
 import com.wm.remusic.uitl.PreferencesUtility;
 import com.wm.remusic.uitl.SortOrder;
 import com.wm.remusic.widget.DividerItemDecoration;
+import com.wm.remusic.widget.SideBar;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -43,28 +49,61 @@ public class ArtistFragment extends BaseFragment {
     private ArtistAdapter mAdapter;
     private PreferencesUtility mPreferences;
     private RecyclerView.ItemDecoration itemDecoration;
+    private boolean isAZSort = true;
+    private HashMap<String, Integer> positionMap = new HashMap<>();
+    private SideBar sideBar;
+    private TextView dialogText;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.recylerview, container, false);
 
         recyclerView = (RecyclerView) view.findViewById(R.id.recyclerview);
-        layoutManager = new LinearLayoutManager(getActivity());
+        layoutManager = new LinearLayoutManager(mContext);
         recyclerView.setLayoutManager(layoutManager);
         //fastScroller = (FastScroller) view.findViewById(R.id.fastscroller);
         //new loadArtists().execute("");
         mAdapter = new ArtistAdapter(null);
         recyclerView.setAdapter(mAdapter);
+        recyclerView.setHasFixedSize(true);
+        ((SimpleItemAnimator) recyclerView.getItemAnimator()).setSupportsChangeAnimations(false);
         setItemDecoration();
+        isAZSort = mPreferences.getArtistSortOrder().equals(SortOrder.ArtistSortOrder.ARTIST_A_Z);
+        dialogText = (TextView) view.findViewById(R.id.dialog_text);
+        sideBar = (SideBar) view.findViewById(R.id.sidebar);
+        sideBar.setOnTouchingLetterChangedListener(new SideBar.OnTouchingLetterChangedListener() {
+            @Override
+            public void onTouchingLetterChanged(String s) {
+                dialogText.setText(s);
+                sideBar.setView(dialogText);
+                Log.e("scrol", "  " + s);
+                if (positionMap.get(s) != null) {
+                    int i = positionMap.get(s);
+                    Log.e("scrolget", "  " + i);
+                    ((LinearLayoutManager) recyclerView.getLayoutManager()).scrollToPositionWithOffset(i, 0);
+                }
+
+            }
+        });
         reloadAdapter();
 
         return view;
     }
 
+    private RecyclerView.OnScrollListener scrollListener = new RecyclerView.OnScrollListener() {
+        @Override
+        public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
+            super.onScrollStateChanged(recyclerView, newState);
+            if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
+                sideBar.setVisibility(View.VISIBLE);
+            }
+        }
+    };
+
     @Override
     public void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mPreferences = PreferencesUtility.getInstance(getActivity());
+        mPreferences = PreferencesUtility.getInstance(mContext);
     }
 
 
@@ -99,7 +138,7 @@ public class ArtistFragment extends BaseFragment {
     //设置分割线
     private void setItemDecoration() {
 
-        itemDecoration = new DividerItemDecoration(getActivity(), DividerItemDecoration.VERTICAL_LIST);
+        itemDecoration = new DividerItemDecoration(mContext, DividerItemDecoration.VERTICAL_LIST);
         recyclerView.addItemDecoration(itemDecoration);
     }
 
@@ -108,7 +147,15 @@ public class ArtistFragment extends BaseFragment {
         new AsyncTask<Void, Void, Void>() {
             @Override
             protected Void doInBackground(final Void... unused) {
-                List<ArtistInfo> artList = MusicUtils.queryArtist(getActivity());
+                isAZSort = mPreferences.getArtistSortOrder().equals(SortOrder.ArtistSortOrder.ARTIST_A_Z);
+                List<ArtistInfo> artList = MusicUtils.queryArtist(mContext);
+                if (isAZSort) {
+                    Collections.sort(artList, new ArtistComparator());
+                    for (int i = 0; i < artList.size(); i++) {
+                        if (positionMap.get(artList.get(i).artist_sort) == null)
+                            positionMap.put(artList.get(i).artist_sort, i);
+                    }
+                }
                 if (artList != null)
                     mAdapter.updateDataSet(artList);
                 return null;
@@ -116,6 +163,12 @@ public class ArtistFragment extends BaseFragment {
 
             @Override
             protected void onPostExecute(Void aVoid) {
+                if (isAZSort) {
+                    recyclerView.addOnScrollListener(scrollListener);
+                } else {
+                    sideBar.setVisibility(View.INVISIBLE);
+                    recyclerView.removeOnScrollListener(scrollListener);
+                }
                 mAdapter.notifyDataSetChanged();
             }
         }.execute();
@@ -126,8 +179,8 @@ public class ArtistFragment extends BaseFragment {
 
         @Override
         protected String doInBackground(String... params) {
-            if (getActivity() != null) {
-                artistInfos = MusicUtils.queryArtist(getActivity());
+            if (mContext != null) {
+                artistInfos = MusicUtils.queryArtist(mContext);
                 if (artistInfos != null)
                     mAdapter = new ArtistAdapter(artistInfos);
             }
@@ -138,7 +191,7 @@ public class ArtistFragment extends BaseFragment {
         @Override
         protected void onPostExecute(String result) {
             recyclerView.setAdapter(mAdapter);
-            if (getActivity() != null) {
+            if (mContext != null) {
                 setItemDecoration();
             }
         }
@@ -182,11 +235,11 @@ public class ArtistFragment extends BaseFragment {
                 ((ListItemViewHolder) holder).moreOverflow.setImageResource(R.drawable.song_play_icon);
                 ((ListItemViewHolder) holder).moreOverflow.setImageTintList(R.color.theme_color_primary);
             } else {
-                ((ListItemViewHolder) holder).moreOverflow.setImageResource(R.drawable.abc_ic_menu_moreoverflow_mtrl_alpha);
+                ((ListItemViewHolder) holder).moreOverflow.setImageResource(R.drawable.list_icn_more);
             }
 
             //lastFm api加载歌手图片
-            LastFmClient.getInstance(getContext()).getArtistInfo(new ArtistQuery(model.artist_name.toString()), new ArtistInfoListener() {
+            LastFmClient.getInstance(mContext).getArtistInfo(new ArtistQuery(model.artist_name.toString()), new ArtistInfoListener() {
                 @Override
                 public void artistInfoSucess(LastfmArtist artist) {
                     if (artist != null && artist.mArtwork != null) {
@@ -240,11 +293,14 @@ public class ArtistFragment extends BaseFragment {
             //加载歌手专辑界面fragment
             @Override
             public void onClick(View v) {
-                FragmentTransaction transaction = ((AppCompatActivity) getContext()).getSupportFragmentManager().beginTransaction();
-                ArtistDetailFragment fragment = ArtistDetailFragment.newInstance(mList.get(getAdapterPosition()).artist_id);
-                transaction.hide(((AppCompatActivity) getContext()).getSupportFragmentManager().findFragmentById(R.id.tab_container));
-                transaction.add(R.id.tab_container, fragment);
-                transaction.addToBackStack(null).commit();
+                if(getAdapterPosition() != -1){
+                    FragmentTransaction transaction = ((AppCompatActivity) mContext).getSupportFragmentManager().beginTransaction();
+                    ArtistDetailFragment fragment = ArtistDetailFragment.newInstance(mList.get(getAdapterPosition()).artist_id);
+                    transaction.hide(((AppCompatActivity) mContext).getSupportFragmentManager().findFragmentById(R.id.tab_container));
+                    transaction.add(R.id.tab_container, fragment);
+                    transaction.addToBackStack(null).commit();
+                }
+
             }
 
         }
