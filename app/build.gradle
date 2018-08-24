@@ -14,6 +14,10 @@ android {
         renderscriptTargetApi project.targetSdkVersion
         renderscriptSupportModeEnabled true
         //end
+
+        ndk {
+            abiFilters "armeabi", "armeabi-v7a", "x86", "mips"
+        }
     }
     buildTypes {
         release {
@@ -22,24 +26,26 @@ android {
         }
     }
 
+
+
     sourceSets.main {
         jniLibs.srcDirs = ['src/main/jniLibs']
     }
 }
 
 dependencies {
-    compile fileTree(include: ['*.jar'], dir: 'libs')
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
     testCompile 'junit:junit:4.12'
-    compile 'com.android.support:appcompat-v7:'+project.supportLib
-    compile 'com.android.support:design:'+project.supportLib
-    compile 'com.facebook.fresco:fresco:0.9.0'
-    compile 'com.squareup.okhttp:okhttp:2.7.2'
-    compile 'com.squareup.okhttp:okhttp-urlconnection:2.7.2'
-    compile 'com.squareup.retrofit:retrofit:1.9.0'
-    //    compile 'com.readystatesoftware.systembartint:systembartint:1.0.3'
-    compile 'com.github.ksoichiro:android-observablescrollview:1.6.0'
-    compile 'com.github.promeg:tinypinyin:1.0.0'
-    compile files('libs/activation.jar')
-    compile files('libs/additionnal.jar')
-    compile files('libs/mail.jar')
+    implementation 'com.android.support:appcompat-v7:'+project.supportLib
+    implementation 'com.android.support:design:'+project.supportLib
+    implementation 'com.facebook.fresco:fresco:0.9.0'
+    implementation 'com.squareup.okhttp:okhttp:2.7.2'
+    implementation 'com.squareup.okhttp:okhttp-urlconnection:2.7.2'
+    implementation 'com.squareup.retrofit:retrofit:1.9.0'
+    //    implementation 'com.readystatesoftware.systembartint:systembartint:1.0.3'
+    implementation 'com.github.ksoichiro:android-observablescrollview:1.6.0'
+    implementation 'com.github.promeg:tinypinyin:1.0.0'
+    implementation files('libs/activation.jar')
+    implementation files('libs/additionnal.jar')
+    implementation files('libs/mail.jar')
 }
